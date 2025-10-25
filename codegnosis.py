@@ -475,6 +475,8 @@ class CodeGnosisApp:
         self.zoom_level = 1.0
         self.last_image_path = None
         self.last_analyzer = None
+        self.last_html_path = None
+        self.last_json_path = None
 
         # App state for dynamic instructions
         self.app_state = "initial"  # States: initial, directory_selected, analyzing, analysis_complete, exported
@@ -705,6 +707,51 @@ class CodeGnosisApp:
 
         self.export_buttons = [md_btn, xlsx_btn, copy_btn]
 
+        # Quick Access Tools
+        quick_access_frame = Frame(
+            left_frame, padx=10, pady=5, relief=tk.GROOVE, borderwidth=2
+        )
+        quick_access_frame.pack(fill="x")
+        self.widgets["quick_access_frame"] = quick_access_frame
+
+        quick_label = Label(
+            quick_access_frame, text="Quick Access:", font=("Arial", 10, "bold")
+        )
+        quick_label.pack(side="left", padx=5)
+        self.widgets["quick_label"] = quick_label
+
+        # View Last Chart button
+        view_chart_btn = Button(
+            quick_access_frame,
+            text="🔍 View Last Chart",
+            command=self.view_last_chart,
+            font=("Arial", 10, "bold"),
+            bg="#00BCD4",
+            fg="white",
+            padx=15,
+            pady=5,
+        )
+        view_chart_btn.pack(side="left", padx=5)
+        view_chart_btn.config(state="disabled")
+        self.widgets["view_chart_btn"] = view_chart_btn
+
+        # Open Chart Folder button
+        open_folder_btn = Button(
+            quick_access_frame,
+            text="📁 Open Chart Folder",
+            command=self.open_chart_folder,
+            font=("Arial", 10, "bold"),
+            bg="#607D8B",
+            fg="white",
+            padx=15,
+            pady=5,
+        )
+        open_folder_btn.pack(side="left", padx=5)
+        open_folder_btn.config(state="disabled")
+        self.widgets["open_folder_btn"] = open_folder_btn
+
+        self.quick_access_buttons = [view_chart_btn, open_folder_btn]
+
         # Canvas
         canvas_frame = Frame(left_frame, relief=tk.SUNKEN, borderwidth=1)
         canvas_frame.pack(fill="both", expand=True, padx=10, pady=10)
@@ -920,6 +967,7 @@ class CodeGnosisApp:
             "json_frame",
             "html_frame",
             "export_frame",
+            "quick_access_frame",
             "canvas_frame",
             "instruction_content",
             "instruction_content_frame",
@@ -956,7 +1004,7 @@ class CodeGnosisApp:
                 )
 
         # Export buttons - keep custom colors, but use white text for dark theme
-        for key in ["md_btn", "xlsx_btn", "copy_btn"]:
+        for key in ["md_btn", "xlsx_btn", "copy_btn", "view_chart_btn", "open_folder_btn"]:
             if key in self.widgets:
                 # Always use white text on colored buttons for better contrast
                 self.widgets[key].config(fg="white")
@@ -1574,11 +1622,18 @@ The HTML export is optimized for large codebases like yours!
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
 
+            # Store path for quick access
+            self.last_json_path = path
+
             self.app_state = "exported"
             self._update_instructions()
 
             # Update filename label
             self.json_filename_label.config(text=f"→ {path.name}")
+
+            # Enable quick access buttons
+            for btn in self.quick_access_buttons:
+                btn.config(state="normal")
 
             # Ask if user wants to open the folder
             result = messagebox.askyesno(
@@ -2212,11 +2267,18 @@ The HTML export is optimized for large codebases like yours!
             with open(path, "w", encoding="utf-8") as f:
                 f.write(html)
 
+            # Store path for "View Last Chart" feature
+            self.last_html_path = path
+
             self.app_state = "exported"
             self._update_instructions()
 
             # Update filename label
             self.html_filename_label.config(text=f"→ {path.name}")
+
+            # Enable quick access buttons
+            for btn in self.quick_access_buttons:
+                btn.config(state="normal")
 
             # Ask if user wants to open in browser
             result = messagebox.askyesno(
@@ -2573,6 +2635,64 @@ Analyze this codebase structure. Help me understand:
                 subprocess.run(["open", str(folder_path)])
             else:  # Linux and others
                 subprocess.run(["xdg-open", str(folder_path)])
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open folder:\n{e}")
+
+    def view_last_chart(self):
+        """Re-open the last exported HTML chart in browser."""
+        if not self.last_html_path:
+            messagebox.showinfo(
+                "No Chart Available",
+                "No HTML chart has been exported yet.\n\nGenerate a chart and export it as HTML first."
+            )
+            return
+
+        if not self.last_html_path.exists():
+            messagebox.showwarning(
+                "File Not Found",
+                f"The last chart file no longer exists:\n\n{self.last_html_path}\n\nIt may have been moved or deleted."
+            )
+            return
+
+        # Open in browser
+        self._open_in_browser(self.last_html_path)
+        self.status.config(text=f"Opened: {self.last_html_path.name}")
+
+    def open_chart_folder(self):
+        """Open the folder containing the last exported chart."""
+        # Determine which folder to open
+        folder_to_open = None
+
+        if self.last_html_path and self.last_html_path.exists():
+            folder_to_open = self.last_html_path.parent
+        elif self.last_json_path and self.last_json_path.exists():
+            folder_to_open = self.last_json_path.parent
+        elif self.last_image_path and Path(self.last_image_path).exists():
+            folder_to_open = Path(self.last_image_path).parent
+        else:
+            # Fall back to project directory
+            project_path = self.project_path.get()
+            if project_path:
+                folder_to_open = Path(project_path)
+
+        if not folder_to_open:
+            messagebox.showinfo(
+                "No Folder Available",
+                "No exports have been created yet.\n\nGenerate and export a chart first."
+            )
+            return
+
+        # Open folder based on platform
+        try:
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(folder_to_open)
+            elif system == "Darwin":  # macOS
+                subprocess.run(["open", str(folder_to_open)])
+            else:  # Linux
+                subprocess.run(["xdg-open", str(folder_to_open)])
+
+            self.status.config(text=f"Opened folder: {folder_to_open.name}")
         except Exception as e:
             messagebox.showerror("Error", f"Could not open folder:\n{e}")
 
