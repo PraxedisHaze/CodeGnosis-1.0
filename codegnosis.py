@@ -1128,13 +1128,15 @@ class CodeGnosisApp:
                 self.widgets[key].config(bg=theme["frame_bg"])
 
         # All labels
+        is_dark = theme in [DARK_THEME, SATURATED_THEME]
+
         for key, widget in self.widgets.items():
             if isinstance(widget, Label):
-                if key == "dir_label":  # Directory path - use lighter blue in dark theme
-                    dir_color = "#2196F3" if theme == DARK_THEME else "blue"
+                if key == "dir_label":  # Directory path - bright light blue in dark mode
+                    dir_color = "#64B5F6" if is_dark else "blue"  # Material Blue 300 - brighter
                     widget.config(bg=theme["frame_bg"], fg=dir_color)
                 elif key in ["json_filename_label", "html_filename_label"]:  # Filename labels
-                    filename_color = "#AAAAAA" if theme == DARK_THEME else "gray"
+                    filename_color = "white" if is_dark else "gray"
                     widget.config(bg=theme["frame_bg"], fg=filename_color)
                 else:
                     widget.config(bg=theme["frame_bg"], fg=theme["fg"])
@@ -1155,8 +1157,8 @@ class CodeGnosisApp:
                     activebackground=theme["highlight"],
                 )
 
-        # Export buttons - keep custom colors, but use white text for dark theme
-        for key in ["md_btn", "xlsx_btn", "copy_btn", "view_chart_btn", "open_folder_btn"]:
+        # Action buttons - always use white text on colored backgrounds
+        for key in ["gen_btn", "json_btn", "html_btn", "md_btn", "xlsx_btn", "copy_btn", "view_chart_btn", "open_folder_btn"]:
             if key in self.widgets:
                 # Always use white text on colored buttons for better contrast
                 self.widgets[key].config(fg="white")
