@@ -54,6 +54,8 @@ LIGHT_THEME = {
     "highlight": "#ffffff",
     "accent": "#4CAF50",
     "status_bg": "#e0e0e0",
+    "scrollbar_bg": "#e0e0e0",
+    "scrollbar_fg": "#999999",
 }
 
 DARK_THEME = {
@@ -66,7 +68,27 @@ DARK_THEME = {
     "highlight": "#3e3e3e",
     "accent": "#007acc",
     "status_bg": "#2a2a2a",
+    "scrollbar_bg": "#1a1a1a",
+    "scrollbar_fg": "#cccccc",
 }
+
+SATURATED_THEME = {
+    "bg": "#0f0f23",  # Deep space blue
+    "fg": "#ffffff",
+    "button_bg": "#1a1f3a",
+    "entry_bg": "#141829",
+    "canvas_bg": "#0a0a15",
+    "frame_bg": "#1a1f3a",
+    "highlight": "#2a2f4a",
+    "accent": "#00d9ff",  # Electric cyan
+    "status_bg": "#141829",
+    "scrollbar_bg": "#0a0a15",
+    "scrollbar_fg": "#00d9ff",
+}
+
+# Theme cycle order
+THEMES = [LIGHT_THEME, DARK_THEME, SATURATED_THEME]
+THEME_NAMES = ["Light", "Dark", "Saturated"]
 
 
 class CodeGnosis:
@@ -226,9 +248,8 @@ class CodeGnosis:
         """Find all relevant files in the project."""
         found = []
         for root, dirs, files in os.walk(self.project_dir):
-            # Filter excluded folders
-            if not self.include_all:
-                dirs[:] = [d for d in dirs if d not in self.excluded_folders]
+            # ALWAYS filter excluded folders (regardless of include_all setting)
+            dirs[:] = [d for d in dirs if d not in self.excluded_folders]
 
             for filename in files:
                 ext = Path(filename).suffix.lower()
@@ -409,16 +430,20 @@ class CodeGnosis:
         # Apply theme
         if is_dark_theme:
             dot.attr(bgcolor="#1e1e1e")
-            dot.attr("node", shape="box", style="rounded,filled", fontcolor="#e0e0e0")
+            dot.attr("node", shape="box", style="rounded,filled", fontcolor="white")
             dot.attr("edge", color="#e0e0e0")
         else:
-            dot.attr("node", shape="box", style="rounded,filled")
+            dot.attr(bgcolor="white")
+            dot.attr("node", shape="box", style="rounded,filled", fontcolor="black")
+            dot.attr("edge", color="black")
 
-        # Add nodes
+        # Add nodes with consistent dark text on light backgrounds
         for file, file_type in self.file_types.items():
             label = Path(file).name
             color = self.CATEGORY_COLORS.get(file_type, self.CATEGORY_COLORS["Default"])
-            dot.node(file, label, fillcolor=color)
+
+            # Always use dark text for maximum legibility
+            dot.node(file, label, fillcolor=color, fontcolor="black")
 
         # Add edges
         for file, deps in self.file_graph.items():
@@ -566,8 +591,13 @@ class CodeGnosisApp:
         gen_btn.pack(side="left", padx=5)
         self.widgets["gen_btn"] = gen_btn
 
+        # JSON Export with filename display
+        json_frame = Frame(actions)
+        json_frame.pack(side="left", padx=5)
+        self.widgets["json_frame"] = json_frame
+
         json_btn = Button(
-            actions,
+            json_frame,
             text="[4] 📊 Export to JSON",
             command=self.export_json,
             font=("Arial", 11, "bold"),
@@ -576,11 +606,25 @@ class CodeGnosisApp:
             padx=15,
             pady=8,
         )
-        json_btn.pack(side="left", padx=5)
+        json_btn.pack()
         self.widgets["json_btn"] = json_btn
 
+        self.json_filename_label = Label(
+            json_frame,
+            text="",
+            font=("Arial", 8, "italic"),
+            fg="gray"
+        )
+        self.json_filename_label.pack()
+        self.widgets["json_filename_label"] = self.json_filename_label
+
+        # HTML Export with filename display
+        html_frame = Frame(actions)
+        html_frame.pack(side="left", padx=5)
+        self.widgets["html_frame"] = html_frame
+
         html_btn = Button(
-            actions,
+            html_frame,
             text="[4] 🌐 Export HTML Report",
             command=self.export_html,
             font=("Arial", 11, "bold"),
@@ -589,8 +633,17 @@ class CodeGnosisApp:
             padx=15,
             pady=8,
         )
-        html_btn.pack(side="left", padx=5)
+        html_btn.pack()
         self.widgets["html_btn"] = html_btn
+
+        self.html_filename_label = Label(
+            html_frame,
+            text="",
+            font=("Arial", 8, "italic"),
+            fg="gray"
+        )
+        self.html_filename_label.pack()
+        self.widgets["html_filename_label"] = self.html_filename_label
 
         # Export buttons
         export_frame = Frame(
@@ -667,7 +720,10 @@ class CodeGnosisApp:
         h_scroll.pack(side="bottom", fill="x")
         v_scroll.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
+
         self.widgets["canvas"] = self.canvas
+        self.widgets["v_scroll"] = v_scroll
+        self.widgets["h_scroll"] = h_scroll
 
         # Bind mouse events
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
@@ -696,6 +752,7 @@ class CodeGnosisApp:
         content_frame = Frame(frame)
         content_frame.pack(fill="both", expand=True, pady=5)
         self.widgets["instruction_content"] = content_frame
+        self.widgets["instruction_content_frame"] = content_frame  # Store for theme updates
 
         # Initial load
         self._update_instructions()
@@ -709,6 +766,9 @@ class CodeGnosisApp:
 
         frame = self.widgets["instruction_content"]
         theme = self.current_theme
+
+        # Ensure content frame has correct background
+        frame.config(bg=theme["frame_bg"])
 
         # Define instruction content based on state
         if self.app_state == "initial":
@@ -821,18 +881,24 @@ class CodeGnosisApp:
                 lbl.pack(anchor="w", pady=1, padx=5)
 
     def toggle_theme(self):
-        """Toggle between light and dark theme."""
-        self.current_theme = (
-            DARK_THEME if self.current_theme == LIGHT_THEME else LIGHT_THEME
-        )
+        """Cycle through all themes: Light → Dark → Saturated → Light..."""
+        # Find current theme index
+        try:
+            current_index = THEMES.index(self.current_theme)
+        except ValueError:
+            current_index = 0
+
+        # Cycle to next theme
+        next_index = (current_index + 1) % len(THEMES)
+        self.current_theme = THEMES[next_index]
+
         self._apply_theme()
         self._update_instructions()  # Refresh instructions with new theme
 
-        # Update theme button text
-        if self.current_theme == DARK_THEME:
-            self.widgets["theme_btn"].config(text="☀️ Toggle Theme")
-        else:
-            self.widgets["theme_btn"].config(text="🌙 Toggle Theme")
+        # Update theme button text with current theme name
+        theme_icons = ["🌙", "🎨", "☀️"]  # Icons for Light→Dark, Dark→Saturated, Saturated→Light
+        next_theme_name = THEME_NAMES[(next_index + 1) % len(THEME_NAMES)]
+        self.widgets["theme_btn"].config(text=f"{theme_icons[next_index]} {THEME_NAMES[next_index]} Theme")
 
     def _apply_theme(self):
         """Apply current theme to all widgets."""
@@ -851,8 +917,12 @@ class CodeGnosisApp:
             "ext_frame",
             "excl_frame",
             "actions",
+            "json_frame",
+            "html_frame",
             "export_frame",
             "canvas_frame",
+            "instruction_content",
+            "instruction_content_frame",
         ]:
             if key in self.widgets:
                 self.widgets[key].config(bg=theme["frame_bg"])
@@ -860,8 +930,12 @@ class CodeGnosisApp:
         # All labels
         for key, widget in self.widgets.items():
             if isinstance(widget, Label):
-                if key == "dir_label":  # Keep directory path blue
-                    widget.config(bg=theme["bg"], fg="blue")
+                if key == "dir_label":  # Directory path - use lighter blue in dark theme
+                    dir_color = "#2196F3" if theme == DARK_THEME else "blue"
+                    widget.config(bg=theme["frame_bg"], fg=dir_color)
+                elif key in ["json_filename_label", "html_filename_label"]:  # Filename labels
+                    filename_color = "#AAAAAA" if theme == DARK_THEME else "gray"
+                    widget.config(bg=theme["frame_bg"], fg=filename_color)
                 else:
                     widget.config(bg=theme["frame_bg"], fg=theme["fg"])
 
@@ -881,12 +955,26 @@ class CodeGnosisApp:
                     activebackground=theme["highlight"],
                 )
 
-        # Export buttons - keep custom colors, only update text color for dark theme
-        # The export buttons (Markdown, Excel, Copy for AI) have brand colors that should be preserved
+        # Export buttons - keep custom colors, but use white text for dark theme
+        for key in ["md_btn", "xlsx_btn", "copy_btn"]:
+            if key in self.widgets:
+                # Always use white text on colored buttons for better contrast
+                self.widgets[key].config(fg="white")
 
         # Canvas
         if "canvas" in self.widgets:
             self.widgets["canvas"].config(bg=theme["canvas_bg"])
+
+        # Scrollbars - themed for dark/saturated modes
+        for key in ["v_scroll", "h_scroll"]:
+            if key in self.widgets:
+                self.widgets[key].config(
+                    bg=theme["scrollbar_bg"],
+                    troughcolor=theme["scrollbar_bg"],
+                    activebackground=theme["scrollbar_fg"],
+                    highlightbackground=theme["frame_bg"],
+                    highlightcolor=theme["scrollbar_fg"]
+                )
 
         # Status bar
         if "status" in self.widgets:
@@ -992,11 +1080,24 @@ class CodeGnosisApp:
     def _post_analysis(self, analyzer, unfamiliar):
         """Post-analysis UI update."""
         try:
-            self.load_image(self.last_image_path)
-
             total = len(analyzer.file_types)
             connections = sum(len(deps) for deps in analyzer.file_graph.values())
 
+            # Update status before loading image
+            self.status.config(text=f"Loading visualization... ({total} files, {connections} connections)")
+            self.root.update_idletasks()  # Force UI update
+
+            # Load the generated chart image
+            if self.last_image_path and Path(self.last_image_path).exists():
+                self.load_image(self.last_image_path)
+            else:
+                messagebox.showwarning(
+                    "Chart Not Found",
+                    f"Chart image was not created.\n\nExpected: {self.last_image_path}\n\n"
+                    "The analysis completed successfully, but the visual chart file is missing."
+                )
+
+            # Final status update
             self.status.config(text=f"✓ Found {total} files, {connections} connections")
 
             for btn in self.export_buttons:
@@ -1005,8 +1106,15 @@ class CodeGnosisApp:
             self.app_state = "analysis_complete"
             self._update_instructions()
 
-            if unfamiliar:
+            # Show unfamiliar extensions dialog
+            if unfamiliar and len(unfamiliar) > 0:
                 self._show_unfamiliar(unfamiliar)
+            elif unfamiliar is not None:
+                # All file types were recognized
+                messagebox.showinfo(
+                    "File Types",
+                    "✓ All file types were recognized!\n\nNo unknown extensions found."
+                )
 
         except Exception as e:
             self._analysis_error(str(e))
@@ -1267,29 +1375,28 @@ The HTML export is optimized for large codebases like yours!
             messagebox.showwarning("Warning", "Generate chart first")
             return
 
-        # Check write permissions
+        # Ask user for filename/location
         project_dir = Path(self.project_path.get())
-        custom_save_path = None
 
-        if not self._check_directory_writable(project_dir):
-            result = messagebox.askyesno(
-                "Permission Denied",
-                f"Cannot write to:\n{project_dir}\n\n"
-                "This directory may be write-protected or require administrator privileges.\n\n"
-                "Would you like to save to a different location?",
-                icon='warning'
-            )
-            if result:
-                custom_save_path = filedialog.asksaveasfilename(
-                    defaultextension=".json",
-                    filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-                    initialfile="ai_context.json",
-                    title="Save JSON to Different Location"
-                )
-                if not custom_save_path:
-                    return
-            else:
-                return
+        # Check if we can write to project directory
+        can_write_to_project = self._check_directory_writable(project_dir)
+
+        # Always offer file save dialog for custom naming
+        if can_write_to_project:
+            initial_dir = str(project_dir)
+        else:
+            initial_dir = str(Path.home() / "Documents")
+
+        custom_save_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialfile="ai_context.json",
+            initialdir=initial_dir,
+            title="Save JSON Export As..."
+        )
+
+        if not custom_save_path:
+            return  # User cancelled
 
         try:
             analyzer = self.last_analyzer
@@ -1461,17 +1568,17 @@ The HTML export is optimized for large codebases like yours!
                 "dependencyGraph": analyzer.file_graph,
             }
 
-            # Use custom path if provided, otherwise default location
-            if custom_save_path:
-                path = Path(custom_save_path)
-            else:
-                path = Path(self.project_path.get()) / "ai_context.json"
+            # Use the path from file dialog
+            path = Path(custom_save_path)
 
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
 
             self.app_state = "exported"
             self._update_instructions()
+
+            # Update filename label
+            self.json_filename_label.config(text=f"→ {path.name}")
 
             # Ask if user wants to open the folder
             result = messagebox.askyesno(
@@ -1619,29 +1726,28 @@ The HTML export is optimized for large codebases like yours!
             messagebox.showwarning("Warning", "Generate chart first")
             return
 
-        # Check write permissions
+        # Ask user for filename/location
         project_dir = Path(self.project_path.get())
-        custom_save_path = None
 
-        if not self._check_directory_writable(project_dir):
-            result = messagebox.askyesno(
-                "Permission Denied",
-                f"Cannot write to:\n{project_dir}\n\n"
-                "This directory may be write-protected or require administrator privileges.\n\n"
-                "Would you like to save to a different location?",
-                icon='warning'
-            )
-            if result:
-                custom_save_path = filedialog.asksaveasfilename(
-                    defaultextension=".html",
-                    filetypes=[("HTML files", "*.html"), ("All files", "*.*")],
-                    initialfile="project_architecture.html",
-                    title="Save HTML to Different Location"
-                )
-                if not custom_save_path:
-                    return
-            else:
-                return
+        # Check if we can write to project directory
+        can_write_to_project = self._check_directory_writable(project_dir)
+
+        # Always offer file save dialog for custom naming
+        if can_write_to_project:
+            initial_dir = str(project_dir)
+        else:
+            initial_dir = str(Path.home() / "Documents")
+
+        custom_save_path = filedialog.asksaveasfilename(
+            defaultextension=".html",
+            filetypes=[("HTML files", "*.html"), ("All files", "*.*")],
+            initialfile="project_architecture.html",
+            initialdir=initial_dir,
+            title="Save HTML Export As..."
+        )
+
+        if not custom_save_path:
+            return  # User cancelled
 
         try:
             # Build nodes and edges for D3
@@ -2100,17 +2206,17 @@ The HTML export is optimized for large codebases like yours!
 </body>
 </html>"""
 
-            # Use custom path if provided, otherwise default location
-            if custom_save_path:
-                path = Path(custom_save_path)
-            else:
-                path = Path(self.project_path.get()) / "project_architecture.html"
+            # Use the path from file dialog
+            path = Path(custom_save_path)
 
             with open(path, "w", encoding="utf-8") as f:
                 f.write(html)
 
             self.app_state = "exported"
             self._update_instructions()
+
+            # Update filename label
+            self.html_filename_label.config(text=f"→ {path.name}")
 
             # Ask if user wants to open in browser
             result = messagebox.askyesno(
