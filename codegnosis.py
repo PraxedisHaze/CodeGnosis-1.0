@@ -24,8 +24,9 @@ from tkinter import (
     Canvas,
     Scrollbar,
     Text,
+    Toplevel,
 )
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageTk, ImageDraw, ImageSequence
 from pathlib import Path
 from datetime import datetime, timezone
 from threading import Thread
@@ -34,6 +35,7 @@ import graphviz
 import webbrowser
 import subprocess
 import platform
+import time
 
 # Optional exports - graceful handling
 try:
@@ -612,9 +614,19 @@ class CodeGnosisApp:
         # App state for dynamic instructions
         self.app_state = "initial"  # States: initial, directory_selected, analyzing, analysis_complete, exported
 
+        # Animation state
+        self.splash_frames = []
+        self.loading_animation_id = None
+        self.curtain_animation_id = None
+        self.sound_enabled = True
+        self.sound_pack = "professional"  # professional, funny, custom
+
         # Build UI
         self._create_ui()
         self._apply_theme()
+
+        # Load splash transition GIF
+        self._load_splash_gif()
 
     def _create_ui(self):
         """Create the main UI."""
@@ -635,50 +647,69 @@ class CodeGnosisApp:
         right_frame.pack_propagate(False)
         self.widgets["right_frame"] = right_frame
 
-        # Controls
-        controls = Frame(left_frame, padx=10, pady=10, relief=tk.RIDGE, borderwidth=2)
-        controls.pack(fill="x", pady=(0, 10))
-        self.widgets["controls"] = controls
+        # =========================
+        # COMPARTMENT 1: Directory Selection
+        # =========================
+        compartment1 = Frame(left_frame, padx=10, pady=10, relief=tk.RAISED, borderwidth=3, bg="#e3f2fd")
+        compartment1.pack(fill="x", pady=5)
+        self.widgets["compartment1"] = compartment1
 
-        # Theme toggle button (top right)
-        theme_btn = Button(
-            controls,
-            text="🌙 Toggle Theme",
-            command=self.toggle_theme,
-            font=("Arial", 10, "bold"),
-        )
-        theme_btn.pack(side="right", padx=5, pady=5)
-        self.widgets["theme_btn"] = theme_btn
+        Label(compartment1, text="[1] PROJECT DIRECTORY", font=("Arial", 11, "bold"), bg="#e3f2fd").pack(anchor="w", pady=(0, 5))
 
-        # Directory selection
-        dir_frame = Frame(controls)
+        dir_frame = Frame(compartment1, bg="#e3f2fd")
         dir_frame.pack(fill="x", pady=5)
         self.widgets["dir_frame"] = dir_frame
 
         dir_btn = Button(
             dir_frame,
-            text="[1] 📂 Select Directory",
+            text="📂 Select Directory",
             command=self.select_directory,
             font=("Arial", 11, "bold"),
+            bg="#1976D2",
+            fg="white",
+            activeforeground="white",
         )
         dir_btn.pack(side="left", padx=5)
         self.widgets["dir_btn"] = dir_btn
 
         dir_label = Label(
-            dir_frame, textvariable=self.project_path, fg="#5DADE2", font=("Arial", 10)
+            dir_frame, textvariable=self.project_path, fg="#5DADE2", font=("Arial", 10), bg="#e3f2fd"
         )
         dir_label.pack(side="left", padx=5, fill="x", expand=True)
         self.widgets["dir_label"] = dir_label
 
+        # Theme toggle in compartment 1
+        theme_btn = Button(
+            compartment1,
+            text="🌙 Toggle Theme",
+            command=self.toggle_theme,
+            font=("Arial", 10, "bold"),
+            bg="#757575",
+            fg="white",
+            activeforeground="white",
+        )
+        theme_btn.pack(side="right", padx=5, pady=5)
+        self.widgets["theme_btn"] = theme_btn
+
+        # =========================
+        # COMPARTMENT 2: Filters
+        # =========================
+        compartment2 = Frame(left_frame, padx=10, pady=10, relief=tk.RAISED, borderwidth=3, bg="#fff3e0")
+        compartment2.pack(fill="x", pady=5)
+        self.widgets["compartment2"] = compartment2
+
+        Label(compartment2, text="[2] SCAN FILTERS", font=("Arial", 11, "bold"), bg="#fff3e0").pack(anchor="w", pady=(0, 5))
+
         # Extensions
-        ext_frame = Frame(controls)
+        ext_frame = Frame(compartment2, bg="#fff3e0")
         ext_frame.pack(fill="x", pady=5)
         self.widgets["ext_frame"] = ext_frame
 
         ext_label = Label(
             ext_frame,
-            text="[2] Extensions (blank = scan ALL):",
+            text="Extensions (blank = scan ALL):",
             font=("Arial", 10, "bold"),
+            bg="#fff3e0"
         )
         ext_label.pack(side="left", padx=5)
         self.widgets["ext_label"] = ext_label
@@ -689,12 +720,12 @@ class CodeGnosisApp:
         self.widgets["ext_entry"] = self.ext_entry
 
         # Exclude folders
-        excl_frame = Frame(controls)
+        excl_frame = Frame(compartment2, bg="#fff3e0")
         excl_frame.pack(fill="x", pady=5)
         self.widgets["excl_frame"] = excl_frame
 
         excl_label = Label(
-            excl_frame, text="[2] Exclude Folders:", font=("Arial", 10, "bold")
+            excl_frame, text="Exclude Folders:", font=("Arial", 10, "bold"), bg="#fff3e0"
         )
         excl_label.pack(side="left", padx=5)
         self.widgets["excl_label"] = excl_label
@@ -706,26 +737,45 @@ class CodeGnosisApp:
         self.exclude_entry.pack(side="left", padx=5, fill="x", expand=True)
         self.widgets["exclude_entry"] = self.exclude_entry
 
-        # Action buttons
-        actions = Frame(controls)
-        actions.pack(pady=10)
-        self.widgets["actions"] = actions
+        # =========================
+        # COMPARTMENT 3: Generation
+        # =========================
+        compartment3 = Frame(left_frame, padx=10, pady=10, relief=tk.RAISED, borderwidth=3, bg="#e8f5e9")
+        compartment3.pack(fill="x", pady=5)
+        self.widgets["compartment3"] = compartment3
+
+        Label(compartment3, text="[3] GENERATE CHART", font=("Arial", 11, "bold"), bg="#e8f5e9").pack(anchor="w", pady=(0, 5))
 
         gen_btn = Button(
-            actions,
-            text="[3] 🎨 Generate Visual Chart",
+            compartment3,
+            text="🎨 Generate Visual Chart",
             command=self.generate_chart,
-            font=("Arial", 11, "bold"),
+            font=("Arial", 12, "bold"),
             bg="#4CAF50",
             fg="white",
-            padx=15,
-            pady=8,
+            activeforeground="white",
+            padx=20,
+            pady=10,
         )
-        gen_btn.pack(side="left", padx=5)
+        gen_btn.pack(pady=5)
         self.widgets["gen_btn"] = gen_btn
 
+        # =========================
+        # COMPARTMENT 4: Exports
+        # =========================
+        compartment4 = Frame(left_frame, padx=10, pady=10, relief=tk.RAISED, borderwidth=3, bg="#fce4ec")
+        compartment4.pack(fill="x", pady=5)
+        self.widgets["compartment4"] = compartment4
+
+        Label(compartment4, text="[4] EXPORTS & TOOLS", font=("Arial", 11, "bold"), bg="#fce4ec").pack(anchor="w", pady=(0, 5))
+
+        # Primary export buttons row
+        primary_exports = Frame(compartment4, bg="#fce4ec")
+        primary_exports.pack(fill="x", pady=5)
+        self.widgets["actions"] = primary_exports
+
         # JSON Export with filename display
-        json_frame = Frame(actions)
+        json_frame = Frame(primary_exports, bg="#fce4ec")
         json_frame.pack(side="left", padx=5)
         self.widgets["json_frame"] = json_frame
 
@@ -778,15 +828,13 @@ class CodeGnosisApp:
         self.html_filename_label.pack()
         self.widgets["html_filename_label"] = self.html_filename_label
 
-        # Export buttons
-        export_frame = Frame(
-            left_frame, padx=10, pady=5, relief=tk.GROOVE, borderwidth=2
-        )
-        export_frame.pack(fill="x")
+        # Additional exports row
+        export_frame = Frame(compartment4, bg="#fce4ec")
+        export_frame.pack(fill="x", pady=5)
         self.widgets["export_frame"] = export_frame
 
         export_label = Label(
-            export_frame, text="[4] Additional Exports:", font=("Arial", 10, "bold")
+            export_frame, text="Additional Exports:", font=("Arial", 10, "bold"), bg="#fce4ec"
         )
         export_label.pack(side="left", padx=5)
         self.widgets["export_label"] = export_label
@@ -841,15 +889,13 @@ class CodeGnosisApp:
 
         self.export_buttons = [md_btn, xlsx_btn, copy_btn]
 
-        # Quick Access Tools
-        quick_access_frame = Frame(
-            left_frame, padx=10, pady=5, relief=tk.GROOVE, borderwidth=2
-        )
-        quick_access_frame.pack(fill="x")
+        # Quick Access Tools row
+        quick_access_frame = Frame(compartment4, bg="#fce4ec")
+        quick_access_frame.pack(fill="x", pady=5)
         self.widgets["quick_access_frame"] = quick_access_frame
 
         quick_label = Label(
-            quick_access_frame, text="Quick Access:", font=("Arial", 10, "bold")
+            quick_access_frame, text="Quick Access:", font=("Arial", 10, "bold"), bg="#fce4ec"
         )
         quick_label.pack(side="left", padx=5)
         self.widgets["quick_label"] = quick_label
@@ -1089,7 +1135,7 @@ class CodeGnosisApp:
                 lbl.pack(anchor="w", pady=1, padx=5)
 
     def toggle_theme(self):
-        """Cycle through all themes: Light → Dark → Saturated → Light..."""
+        """Cycle through all themes with splash transition."""
         # Find current theme index
         try:
             current_index = THEMES.index(self.current_theme)
@@ -1100,13 +1146,20 @@ class CodeGnosisApp:
         next_index = (current_index + 1) % len(THEMES)
         self.current_theme = THEMES[next_index]
 
-        self._apply_theme()
-        self._update_instructions()  # Refresh instructions with new theme
+        # Play sound
+        self._play_sound("theme")
 
-        # Update theme button text with current theme name
-        theme_icons = ["🌙", "🎨", "☀️"]  # Icons for Light→Dark, Dark→Saturated, Saturated→Light
-        next_theme_name = THEME_NAMES[(next_index + 1) % len(THEME_NAMES)]
-        self.widgets["theme_btn"].config(text=f"{theme_icons[next_index]} {THEME_NAMES[next_index]} Theme")
+        # Define the theme application callback
+        def apply_theme_changes():
+            self._apply_theme()
+            self._update_instructions()
+
+            # Update theme button text
+            theme_icons = ["🌙", "🎨", "☀️"]
+            self.widgets["theme_btn"].config(text=f"{theme_icons[next_index]} {THEME_NAMES[next_index]} Theme")
+
+        # Play splash transition animation with theme change
+        self._play_splash_transition(callback=apply_theme_changes)
 
     def _apply_theme(self):
         """Apply current theme to all widgets."""
@@ -1115,12 +1168,20 @@ class CodeGnosisApp:
         # Root window
         self.root.config(bg=theme["bg"])
 
+        # Compartment colors (theme-aware)
+        is_light = theme == LIGHT_THEME
+        comp_colors = {
+            "compartment1": "#e3f2fd" if is_light else theme["frame_bg"],  # Light blue
+            "compartment2": "#fff3e0" if is_light else theme["frame_bg"],  # Light orange
+            "compartment3": "#e8f5e9" if is_light else theme["frame_bg"],  # Light green
+            "compartment4": "#fce4ec" if is_light else theme["frame_bg"],  # Light pink
+        }
+
         # All frames
         for key in [
             "main_frame",
             "left_frame",
             "right_frame",
-            "controls",
             "dir_frame",
             "ext_frame",
             "excl_frame",
@@ -1134,7 +1195,12 @@ class CodeGnosisApp:
             "instruction_content_frame",
         ]:
             if key in self.widgets:
-                self.widgets[key].config(bg=theme["frame_bg"])
+                self.widgets[key].config(bg=comp_colors.get(key, theme["frame_bg"]))
+
+        # Compartments with specific colors
+        for comp_key, comp_color in comp_colors.items():
+            if comp_key in self.widgets:
+                self.widgets[comp_key].config(bg=comp_color)
 
         # All labels
         is_dark = theme in [DARK_THEME, SATURATED_THEME]
@@ -1148,18 +1214,31 @@ class CodeGnosisApp:
             "quick_label": theme.get("accent4", theme["fg"]),   # Green
         }
 
+        # Label backgrounds should match their parent compartments
+        label_comp_map = {
+            "dir_label": "compartment1",
+            "ext_label": "compartment2",
+            "excl_label": "compartment2",
+            "export_label": "compartment4",
+            "quick_label": "compartment4",
+        }
+
         for key, widget in self.widgets.items():
             if isinstance(widget, Label):
+                # Get appropriate background for this label
+                parent_comp = label_comp_map.get(key)
+                label_bg = comp_colors.get(parent_comp, theme["frame_bg"])
+
                 if key == "dir_label":  # Directory path - bright light blue in dark mode
                     dir_color = "#64B5F6" if is_dark else "blue"  # Material Blue 300 - brighter
-                    widget.config(bg=theme["frame_bg"], fg=dir_color)
+                    widget.config(bg=label_bg, fg=dir_color)
                 elif key in ["json_filename_label", "html_filename_label"]:  # Filename labels
                     filename_color = "white" if is_dark else "gray"
-                    widget.config(bg=theme["frame_bg"], fg=filename_color)
+                    widget.config(bg=label_bg, fg=filename_color)
                 elif is_rainbow and key in rainbow_colors:  # Rainbow section labels
-                    widget.config(bg=theme["frame_bg"], fg=rainbow_colors[key])
+                    widget.config(bg=label_bg, fg=rainbow_colors[key])
                 else:
-                    widget.config(bg=theme["frame_bg"], fg=theme["fg"])
+                    widget.config(bg=label_bg, fg=theme["fg"])
 
         # All entries
         for key in ["ext_entry", "exclude_entry"]:
@@ -1216,19 +1295,24 @@ class CodeGnosisApp:
             self._update_instructions()
 
     def generate_chart(self):
-        """Generate visual chart in thread."""
+        """Generate visual chart with loading animation."""
         if not self.project_path.get():
             messagebox.showerror("Error", "Please select a directory first")
             return
 
+        # Play sound
+        self._play_sound("generate")
+
         self.status.config(text="Analyzing project... Please wait")
-        self.canvas.delete("all")
 
         for btn in self.export_buttons:
             btn.config(state="disabled")
 
         self.app_state = "analyzing"
         self._update_instructions()
+
+        # Show loading animation
+        self._show_loading_animation()
 
         thread = Thread(target=self._analyze_in_thread, daemon=True)
         thread.start()
@@ -1300,8 +1384,11 @@ class CodeGnosisApp:
             self.root.after(0, lambda: self._analysis_error(error_msg))
 
     def _post_analysis(self, analyzer, unfamiliar):
-        """Post-analysis UI update."""
+        """Post-analysis UI update with animations."""
         try:
+            # Stop loading animation
+            self._stop_loading_animation()
+
             total = len(analyzer.file_types)
             connections = sum(len(deps) for deps in analyzer.file_graph.values())
 
@@ -1312,12 +1399,17 @@ class CodeGnosisApp:
             # Load the generated chart image
             if self.last_image_path and Path(self.last_image_path).exists():
                 self.load_image(self.last_image_path)
+                # Show curtain reveal animation
+                self._show_curtain_reveal()
             else:
                 messagebox.showwarning(
                     "Chart Not Found",
                     f"Chart image was not created.\n\nExpected: {self.last_image_path}\n\n"
                     "The analysis completed successfully, but the visual chart file is missing."
                 )
+
+            # Play completion sound
+            self._play_sound("complete")
 
             # Final status update
             self.status.config(text=f"✓ Found {total} files, {connections} connections")
@@ -2930,6 +3022,166 @@ Analyze this codebase structure. Help me understand:
             webbrowser.open(file_url)
         except Exception as e:
             messagebox.showerror("Error", f"Could not open browser:\n{e}")
+
+    def _load_splash_gif(self):
+        """Load the splash transition GIF frames."""
+        try:
+            gif_path = Path(__file__).parent / "splash_transition2.gif"
+            if not gif_path.exists():
+                gif_path = Path(__file__).parent / "splash_transition.gif"
+
+            if gif_path.exists():
+                img = Image.open(gif_path)
+                for frame in ImageSequence.Iterator(img):
+                    frame = frame.copy().convert("RGBA")
+                    # Resize to fit window
+                    frame = frame.resize((1250, 850), Image.Resampling.LANCZOS)
+                    self.splash_frames.append(ImageTk.PhotoImage(frame))
+        except Exception:
+            # Silently fail if GIF not available
+            pass
+
+    def _play_splash_transition(self, callback=None):
+        """Play splash transition animation overlay."""
+        if not self.splash_frames:
+            if callback:
+                callback()
+            return
+
+        # Create fullscreen overlay
+        overlay = Toplevel(self.root)
+        overlay.attributes('-topmost', True)
+        overlay.overrideredirect(True)
+        overlay.geometry(f"{self.root.winfo_width()}x{self.root.winfo_height()}+{self.root.winfo_x()}+{self.root.winfo_y()}")
+
+        splash_label = Label(overlay, bg="black")
+        splash_label.pack(fill="both", expand=True)
+
+        frame_index = [0]
+
+        def show_frame():
+            if frame_index[0] < len(self.splash_frames):
+                splash_label.config(image=self.splash_frames[frame_index[0]])
+                frame_index[0] += 1
+                overlay.after(30, show_frame)  # ~33 FPS
+            else:
+                overlay.destroy()
+                if callback:
+                    callback()
+
+        show_frame()
+
+    def _show_loading_animation(self):
+        """Show loading animation in chart area."""
+        self.canvas.delete("all")
+
+        # Create loading elements
+        center_x = self.canvas.winfo_width() / 2 if self.canvas.winfo_width() > 1 else 400
+        center_y = self.canvas.winfo_height() / 2 if self.canvas.winfo_height() > 1 else 300
+
+        # Animated dots
+        dots = []
+        for i in range(3):
+            dot = self.canvas.create_oval(
+                center_x - 40 + i * 40, center_y,
+                center_x - 20 + i * 40, center_y + 20,
+                fill=self.current_theme["accent"], outline=""
+            )
+            dots.append(dot)
+
+        # Loading text
+        text = self.canvas.create_text(
+            center_x, center_y - 40,
+            text="🧠 Analyzing Project...",
+            font=("Arial", 16, "bold"),
+            fill=self.current_theme["fg"]
+        )
+
+        # Animation state
+        animation_state = {"offset": 0}
+
+        def animate():
+            if self.app_state == "analyzing":
+                # Bounce dots
+                for i, dot in enumerate(dots):
+                    y_offset = 20 * abs((animation_state["offset"] + i * 10) % 60 - 30) / 30
+                    self.canvas.coords(
+                        dot,
+                        center_x - 40 + i * 40, center_y - y_offset,
+                        center_x - 20 + i * 40, center_y + 20 - y_offset
+                    )
+
+                animation_state["offset"] += 2
+                self.loading_animation_id = self.canvas.after(50, animate)
+
+        animate()
+
+    def _stop_loading_animation(self):
+        """Stop loading animation."""
+        if self.loading_animation_id:
+            self.canvas.after_cancel(self.loading_animation_id)
+            self.loading_animation_id = None
+
+    def _show_curtain_reveal(self):
+        """Show curtain reveal animation for chart."""
+        if not self.original_image:
+            return
+
+        # Create curtain overlay
+        img_width, img_height = self.original_image.size
+
+        # Curtain state
+        curtain_state = {"width": img_width}
+
+        def animate_curtain():
+            if curtain_state["width"] > 0:
+                # Redraw image with curtain
+                temp_img = self.original_image.copy()
+                draw = ImageDraw.Draw(temp_img, 'RGBA')
+
+                # Draw left and right curtains
+                curtain_width = curtain_state["width"] // 2
+                draw.rectangle([0, 0, curtain_width, img_height], fill=(0, 0, 0, 200))
+                draw.rectangle([img_width - curtain_width, 0, img_width, img_height], fill=(0, 0, 0, 200))
+
+                # Update canvas
+                self.photo_image = ImageTk.PhotoImage(temp_img)
+                self.canvas.delete("all")
+                self.canvas.create_image(0, 0, anchor="nw", image=self.photo_image)
+                self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+                # Continue animation
+                curtain_state["width"] -= img_width // 20  # 20 frames
+                self.curtain_animation_id = self.canvas.after(30, animate_curtain)
+            else:
+                # Final image without curtain
+                self._display_image()
+
+        animate_curtain()
+
+    def _play_sound(self, sound_type):
+        """Play sound effect (placeholder for now)."""
+        if not self.sound_enabled:
+            return
+
+        # Sound types: "click", "generate", "export", "theme", "complete"
+        # This is a placeholder - actual sound playback would require pygame or winsound
+        # For now, just use system beep on Windows
+        try:
+            if platform.system() == "Windows":
+                import winsound
+                freq_map = {
+                    "click": 800,
+                    "generate": 1000,
+                    "export": 1200,
+                    "theme": 1500,
+                    "complete": 2000,
+                }
+                freq = freq_map.get(sound_type, 1000)
+                duration = 100  # milliseconds
+                winsound.Beep(freq, duration)
+        except:
+            pass
 
 
 if __name__ == "__main__":
