@@ -224,6 +224,11 @@ class CodeGnosis:
         self.unfamiliar_extensions = set()
         self.found_extensions = set()
 
+        # Connectivity analysis
+        self.missing_assets = {}  # {file: [missing_references]}
+        self.orphaned_files = set()  # Files never referenced
+        self.asset_references = {}  # {file: [referenced_assets]}
+
     def analyze(self):
         """Main analysis entry point."""
         files = self._find_files()
@@ -241,6 +246,9 @@ class CodeGnosis:
                 resolved = self._resolve_path(file_path, dep)
                 if resolved and resolved in self.file_types:
                     self.file_graph[rel_path].append(resolved)
+
+        # Perform connectivity analysis
+        self._analyze_connectivity(files)
 
         return self.file_graph, self.file_types, self.unfamiliar_extensions
 
@@ -412,6 +420,125 @@ class CodeGnosis:
                 candidates.append(resolved)
             except:
                 pass
+
+        for candidate in candidates:
+            try:
+                if candidate.exists() and candidate.is_relative_to(self.project_dir):
+                    return self._get_relpath(candidate)
+            except:
+                pass
+
+        return None
+
+    def _analyze_connectivity(self, files):
+        """Analyze asset connectivity - find missing assets and orphaned files."""
+        # Patterns for finding asset references
+        asset_patterns = [
+            # Images in HTML/JSX/TSX
+            (r'<img[^>]+src=["\'](.*?)["\']', ['html', 'jsx', 'tsx', 'js', 'ts']),
+            # CSS url() references
+            (r'url\(["\']?(.*?)["\']?\)', ['css', 'scss', 'sass']),
+            # Python file opens
+            (r'open\(["\']([^"\']+\.(?:png|jpg|jpeg|gif|svg|ico|pdf|csv|json|txt))["\']', ['py']),
+            # Explicit image imports (JS/TS)
+            (r'from\s+["\']([^"\']+\.(?:png|jpg|jpeg|gif|svg|ico))["\']', ['js', 'jsx', 'ts', 'tsx']),
+            (r'require\(["\']([^"\']+\.(?:png|jpg|jpeg|gif|svg|ico))["\']', ['js', 'jsx', 'ts', 'tsx']),
+            # Font references
+            (r'url\(["\']?([^"\']+\.(?:woff|woff2|ttf|eot))["\']?\)', ['css', 'scss']),
+        ]
+
+        all_existing_files = set(self.file_types.keys())
+        referenced_files = set()
+
+        # Scan each file for asset references
+        for file_path in files:
+            rel_path = self._get_relpath(file_path)
+            category = self.file_types.get(rel_path)
+
+            # Skip binary/media files for scanning
+            if category in ["Image", "Video", "Audio", "Font", "Archive"]:
+                continue
+
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+
+                file_refs = []
+
+                # Check each pattern
+                for pattern, applicable_types in asset_patterns:
+                    # Check if this pattern applies to this file type
+                    if not any(ext in str(file_path).lower() for ext in applicable_types):
+                        continue
+
+                    matches = re.findall(pattern, content)
+                    for match in matches:
+                        # Clean the match
+                        asset_ref = match.strip()
+                        if not asset_ref or asset_ref.startswith('http'):
+                            continue
+
+                        # Try to resolve the asset path
+                        resolved = self._resolve_asset_path(file_path, asset_ref)
+
+                        if resolved:
+                            referenced_files.add(resolved)
+                            file_refs.append(asset_ref)
+
+                            # Check if the asset actually exists
+                            if resolved not in all_existing_files:
+                                if rel_path not in self.missing_assets:
+                                    self.missing_assets[rel_path] = []
+                                self.missing_assets[rel_path].append(asset_ref)
+
+                if file_refs:
+                    self.asset_references[rel_path] = file_refs
+
+            except Exception:
+                pass
+
+        # Mark files imported by others (add to referenced set)
+        for deps in self.file_graph.values():
+            referenced_files.update(deps)
+
+        # Find orphaned files (exist but never referenced)
+        self.orphaned_files = all_existing_files - referenced_files
+
+        # Remove entry points from orphans (they're supposed to be standalone)
+        imported_files = set()
+        for deps in self.file_graph.values():
+            imported_files.update(deps)
+
+        # Entry points are files that nothing imports
+        entry_points = all_existing_files - imported_files
+
+        # Don't mark entry points as orphans
+        self.orphaned_files = self.orphaned_files - entry_points
+
+    def _resolve_asset_path(self, from_file, asset_ref):
+        """Resolve an asset reference to a file path."""
+        if not asset_ref:
+            return None
+
+        current_dir = Path(from_file).parent
+
+        # Try relative to current file
+        candidates = [
+            current_dir / asset_ref,
+            self.project_dir / asset_ref,
+        ]
+
+        # Try relative paths
+        if asset_ref.startswith('./') or asset_ref.startswith('../'):
+            try:
+                resolved = (current_dir / asset_ref).resolve()
+                candidates.append(resolved)
+            except:
+                pass
+
+        # Try common asset directories
+        for asset_dir in ['assets', 'images', 'img', 'static', 'public', 'media']:
+            candidates.append(self.project_dir / asset_dir / asset_ref)
 
         for candidate in candidates:
             try:
@@ -863,15 +990,40 @@ class CodeGnosisApp:
             ]
         elif self.app_state == "analysis_complete":
             stats = ""
+            connectivity_health = []
+
             if self.last_analyzer:
                 total = len(self.last_analyzer.file_types)
                 connections = sum(len(deps) for deps in self.last_analyzer.file_graph.values())
                 stats = f"{total} files • {connections} connections"
 
+                # Add connectivity analysis
+                missing_count = len(self.last_analyzer.missing_assets)
+                orphaned_count = len(self.last_analyzer.orphaned_files)
+
+                if missing_count > 0 or orphaned_count > 0:
+                    connectivity_health = [
+                        ("⚠️ Connectivity Report:", ""),
+                    ]
+                    if missing_count > 0:
+                        connectivity_health.append(("⚠️", f"{missing_count} file(s) with broken references"))
+                    if orphaned_count > 0:
+                        connectivity_health.append(("🔍", f"{orphaned_count} unused file(s) detected"))
+                    connectivity_health.append(("", "Details included in JSON export"))
+                    connectivity_health.append(("", ""))
+                else:
+                    connectivity_health = [
+                        ("✅ Connectivity Health:", ""),
+                        ("✓", "All asset references valid"),
+                        ("✓", "No orphaned files detected"),
+                        ("", ""),
+                    ]
+
             content = [
                 ("🎉 Mission Complete!", ""),
                 ("", stats if stats else "Analysis successful!"),
                 ("", ""),
+            ] + connectivity_health + [
                 ("📊 Export Options:", ""),
                 ("📋", "Copy for AI - Quick clipboard export"),
                 ("📝", "Markdown - Detailed documentation"),
@@ -1544,6 +1696,28 @@ The HTML export is optimized for large codebases like yours!
                     }
                 )
 
+            # Add connectivity warnings
+            for file, missing in analyzer.missing_assets.items():
+                health_warnings.append(
+                    {
+                        "type": "missing_asset",
+                        "file": file,
+                        "missingAssets": missing,
+                        "reason": f"{len(missing)} referenced asset(s) not found",
+                        "severity": "high",
+                    }
+                )
+
+            for orphaned_file in analyzer.orphaned_files:
+                health_warnings.append(
+                    {
+                        "type": "unused_file",
+                        "file": orphaned_file,
+                        "reason": "File exists but is never referenced",
+                        "severity": "low",
+                    }
+                )
+
             # Detect frameworks and project type
             frameworks = self._detect_frameworks(analyzer.file_types)
             project_type = self._detect_project_type(analyzer.file_types, entry_points)
@@ -1560,6 +1734,9 @@ The HTML export is optimized for large codebases like yours!
                     "isEntryPoint": file in [ep["file"] for ep in entry_points],
                     "isOrphaned": file in orphaned,
                     "dependencyCount": len(analyzer.file_graph.get(file, [])),
+                    "assetReferences": analyzer.asset_references.get(file, []),
+                    "missingAssets": analyzer.missing_assets.get(file, []),
+                    "isUnused": file in analyzer.orphaned_files,
                 }
 
                 # Add file size and line count if file exists
@@ -1611,6 +1788,14 @@ The HTML export is optimized for large codebases like yours!
                     "circularDependencies": len(circular_deps),
                     "orphanedFiles": len(orphaned),
                     "highComplexityFiles": len(god_files),
+                    "filesWithMissingAssets": len(analyzer.missing_assets),
+                    "unusedFiles": len(analyzer.orphaned_files),
+                    "connectivityHealthScore": self._calculate_connectivity_score(analyzer),
+                },
+                "connectivity": {
+                    "missingAssets": {file: refs for file, refs in analyzer.missing_assets.items()},
+                    "unusedFiles": list(analyzer.orphaned_files),
+                    "assetReferences": {file: refs for file, refs in analyzer.asset_references.items()},
                 },
                 "files": detailed_files,
                 "dependencyGraph": analyzer.file_graph,
@@ -1714,6 +1899,20 @@ The HTML export is optimized for large codebases like yours!
             max_depth = max(max_depth, depth)
 
         return max_depth
+
+    def _calculate_connectivity_score(self, analyzer):
+        """Calculate connectivity health score (0-100)."""
+        total_files = len(analyzer.file_types)
+        if total_files == 0:
+            return 100
+
+        # Penalties
+        missing_penalty = len(analyzer.missing_assets) * 10  # Each broken reference = -10 points
+        unused_penalty = len(analyzer.orphaned_files) * 2    # Each unused file = -2 points
+
+        # Calculate score
+        score = 100 - missing_penalty - unused_penalty
+        return max(0, min(100, score))  # Clamp between 0-100
 
     def _detect_frameworks(self, file_types):
         """Detect frameworks used in the project."""
