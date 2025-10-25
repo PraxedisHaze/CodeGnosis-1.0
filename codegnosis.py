@@ -781,11 +781,12 @@ class CodeGnosisApp:
 
         json_btn = Button(
             json_frame,
-            text="[4] 📊 Export to JSON",
+            text="📊 Export to JSON",
             command=self.export_json,
             font=("Arial", 11, "bold"),
             bg="#2196F3",
             fg="white",
+            activeforeground="white",
             padx=15,
             pady=8,
         )
@@ -796,23 +797,25 @@ class CodeGnosisApp:
             json_frame,
             text="",
             font=("Arial", 8, "italic"),
-            fg="gray"
+            fg="gray",
+            bg="#fce4ec"
         )
         self.json_filename_label.pack()
         self.widgets["json_filename_label"] = self.json_filename_label
 
         # HTML Export with filename display
-        html_frame = Frame(actions)
+        html_frame = Frame(primary_exports, bg="#fce4ec")
         html_frame.pack(side="left", padx=5)
         self.widgets["html_frame"] = html_frame
 
         html_btn = Button(
             html_frame,
-            text="[4] 🌐 Export HTML Report",
+            text="🌐 Export HTML Report",
             command=self.export_html,
             font=("Arial", 11, "bold"),
             bg="#FF9800",
             fg="white",
+            activeforeground="white",
             padx=15,
             pady=8,
         )
@@ -823,7 +826,8 @@ class CodeGnosisApp:
             html_frame,
             text="",
             font=("Arial", 8, "italic"),
-            fg="gray"
+            fg="gray",
+            bg="#fce4ec"
         )
         self.html_filename_label.pack()
         self.widgets["html_filename_label"] = self.html_filename_label
