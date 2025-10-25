@@ -1,0 +1,6 @@
+Pillow
+graphviz
+pystray
+python-docx
+python-pptx
+openpyxl
