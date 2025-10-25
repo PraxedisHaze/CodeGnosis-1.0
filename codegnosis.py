@@ -80,10 +80,14 @@ SATURATED_THEME = {
     "canvas_bg": "#0a0a15",
     "frame_bg": "#1a1f3a",
     "highlight": "#2a2f4a",
-    "accent": "#00d9ff",  # Electric cyan
+    "accent": "#ff00ff",  # Magenta for rainbow feel
+    "accent2": "#00d9ff",  # Electric cyan
+    "accent3": "#ff6b00",  # Orange
+    "accent4": "#39ff14",  # Neon green
     "status_bg": "#141829",
     "scrollbar_bg": "#0a0a15",
-    "scrollbar_fg": "#00d9ff",
+    "scrollbar_fg": "#ff00ff",  # Rainbow scrollbar
+    "rainbow": True,  # Flag to enable rainbow features
 }
 
 # Theme cycle order
@@ -795,6 +799,7 @@ class CodeGnosisApp:
             font=("Arial", 10, "bold"),
             bg="#9C27B0",
             fg="white",
+            activeforeground="white",
             padx=15,
             pady=5,
         )
@@ -810,6 +815,7 @@ class CodeGnosisApp:
             font=("Arial", 10, "bold"),
             bg="#217346",
             fg="white",
+            activeforeground="white",
             padx=15,
             pady=5,
         )
@@ -824,6 +830,7 @@ class CodeGnosisApp:
             command=self.copy_for_ai,
             font=("Arial", 10, "bold"),
             bg="#E91E63",
+            activeforeground="white",
             fg="white",
             padx=15,
             pady=5,
@@ -855,6 +862,7 @@ class CodeGnosisApp:
             font=("Arial", 10, "bold"),
             bg="#00BCD4",
             fg="white",
+            activeforeground="white",
             padx=15,
             pady=5,
         )
@@ -870,6 +878,7 @@ class CodeGnosisApp:
             font=("Arial", 10, "bold"),
             bg="#607D8B",
             fg="white",
+            activeforeground="white",
             padx=15,
             pady=5,
         )
@@ -1129,6 +1138,15 @@ class CodeGnosisApp:
 
         # All labels
         is_dark = theme in [DARK_THEME, SATURATED_THEME]
+        is_rainbow = theme.get("rainbow", False)
+
+        # Rainbow accent colors for section labels in Saturated theme
+        rainbow_colors = {
+            "ext_label": theme.get("accent", theme["fg"]),      # Magenta
+            "excl_label": theme.get("accent2", theme["fg"]),    # Cyan
+            "export_label": theme.get("accent3", theme["fg"]),  # Orange
+            "quick_label": theme.get("accent4", theme["fg"]),   # Green
+        }
 
         for key, widget in self.widgets.items():
             if isinstance(widget, Label):
@@ -1138,6 +1156,8 @@ class CodeGnosisApp:
                 elif key in ["json_filename_label", "html_filename_label"]:  # Filename labels
                     filename_color = "white" if is_dark else "gray"
                     widget.config(bg=theme["frame_bg"], fg=filename_color)
+                elif is_rainbow and key in rainbow_colors:  # Rainbow section labels
+                    widget.config(bg=theme["frame_bg"], fg=rainbow_colors[key])
                 else:
                     widget.config(bg=theme["frame_bg"], fg=theme["fg"])
 
@@ -1161,7 +1181,7 @@ class CodeGnosisApp:
         for key in ["gen_btn", "json_btn", "html_btn", "md_btn", "xlsx_btn", "copy_btn", "view_chart_btn", "open_folder_btn"]:
             if key in self.widgets:
                 # Always use white text on colored buttons for better contrast
-                self.widgets[key].config(fg="white")
+                self.widgets[key].config(fg="white", activeforeground="white")
 
         # Canvas
         if "canvas" in self.widgets:
