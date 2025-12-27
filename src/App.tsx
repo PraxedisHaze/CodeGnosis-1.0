@@ -68,6 +68,18 @@ function App() {
             Select Directory
           </button>
 
+          <button
+            onClick={() => {
+              setProjectPath('')
+              setAnalysisResult(null)
+              setError(null)
+            }}
+            className="btn btn-secondary"
+            style={{ marginLeft: '0.5rem' }}
+          >
+            Reset
+          </button>
+
           {projectPath && (
             <div className="project-path">
               <strong>Project:</strong> {projectPath}

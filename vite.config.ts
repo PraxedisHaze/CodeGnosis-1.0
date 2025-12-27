@@ -8,10 +8,10 @@ export default defineConfig({
   // Prevent vite from obscuring rust errors
   clearScreen: false,
 
-  // Tauri expects a fixed port
+  // Auto-find available port (5173-5183 range)
   server: {
     port: 5173,
-    strictPort: true,
+    strictPort: false,
   },
 
   // Environment variables for Tauri

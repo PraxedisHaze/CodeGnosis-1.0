@@ -258,6 +258,13 @@ pub fn run() {
       }
       Ok(())
     })
+    .on_window_event(|window, event| {
+      // Exit entire application when main window is closed
+      if let tauri::WindowEvent::CloseRequested { .. } = event {
+        log::info!("Window closed, exiting application");
+        std::process::exit(0);
+      }
+    })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

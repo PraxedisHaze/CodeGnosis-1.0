@@ -46,3 +46,37 @@ ai_context.json
 
 # Temp files
 .codegnosis_write_test
+nul
+
+# AI bundles (can grow huge)
+ai_bundle_*.txt
+
+# Analysis outputs
+*_result.json
+*_analysis.json
+codegnosis_*.json
+test_*.json
+
+# PyInstaller spec files
+*.spec
+
+# Backup files
+*.bak
+*.BAK
+*.bak.*
+
+# Old/renamed binaries
+src-tauri/binaries/aletheari_*
+
+# Build artifacts
+project_architecture/
+
+# Image working files (keep final PNGs)
+*.xcf
+*.psd
+
+# Node
+node_modules/
+
+# Rust/Tauri build
+src-tauri/target/
