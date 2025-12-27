@@ -386,6 +386,31 @@ class AnalyzerCore:
         except:
             return []
 
+        # Map extensions to config parser keys
+        ext_to_parser_key = {
+            ".java": "java", ".jav": "java", ".j": "java",
+            ".cs": "csharp", ".cshtml": "csharp", ".csx": "csharp",
+            ".c": "c",
+            ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".c++": "cpp", ".cp": "cpp",
+            ".h": "cpp", ".hpp": "cpp", ".hxx": "cpp", ".hh": "cpp", ".h++": "cpp",
+            ".inl": "cpp", ".tpp": "cpp", ".tcc": "cpp", ".inc": "cpp",
+            ".go": "go",
+            ".rs": "rust",
+            ".php": "php", ".phtml": "php", ".php3": "php", ".php4": "php", ".php5": "php",
+        }
+
+        # Check if we have custom regex parsers for this extension
+        parser_key = ext_to_parser_key.get(ext)
+        custom_parsers = self.config.get("custom_regex_parsers", {})
+
+        if parser_key and parser_key in custom_parsers:
+            # Use config-driven parsing
+            imports = self._apply_custom_parsers(content, custom_parsers[parser_key], parser_key)
+            if imports:
+                return imports
+            # Fall through to hardcoded if config parsing returned nothing
+
+        # Hardcoded fallbacks (original behavior)
         if ext == ".py":
             return self._detect_python_imports(content)
         elif ext in [".js", ".jsx", ".ts", ".tsx", ".cjs"]:
@@ -410,6 +435,97 @@ class AnalyzerCore:
             return self._detect_json_refs(content)
         else:
             return []
+
+    def _apply_custom_parsers(self, content, parsers, lang_key):
+        """
+        Apply custom regex parsers from config to extract imports.
+        Returns list of resolved import paths.
+        """
+        imports = []
+
+        for parser in parsers:
+            pattern = parser.get("regex_pattern")
+            if not pattern:
+                continue
+
+            is_multiline = parser.get("is_multiline", False)
+            capture_group = parser.get("capture_group", 1)
+            pattern_name = parser.get("pattern_name", "unknown")
+
+            flags = re.MULTILINE if is_multiline else 0
+
+            try:
+                matches = re.findall(pattern, content, flags)
+
+                for match in matches:
+                    # Handle tuple results from multiple capture groups
+                    if isinstance(match, tuple):
+                        if capture_group <= len(match):
+                            raw_import = match[capture_group - 1]
+                        else:
+                            raw_import = match[0] if match else ""
+                    else:
+                        raw_import = match
+
+                    if not raw_import or not raw_import.strip():
+                        continue
+
+                    # Convert raw import to file path based on language
+                    resolved = self._convert_import_to_path(raw_import.strip(), lang_key, pattern_name)
+                    if resolved:
+                        if isinstance(resolved, list):
+                            imports.extend(resolved)
+                        else:
+                            imports.append(resolved)
+
+            except re.error as e:
+                self.logger.warning(f"Invalid regex pattern '{pattern_name}': {e}")
+                continue
+
+        return imports
+
+    def _convert_import_to_path(self, raw_import, lang_key, pattern_name):
+        """
+        Convert a raw import string to a file path based on language conventions.
+        """
+        if not raw_import:
+            return None
+
+        if lang_key == "java":
+            # com.example.Class -> com/example/Class.java
+            path = raw_import.replace(".", "/")
+            if path.endswith("/*"):
+                return path[:-2]  # Package directory
+            return path + ".java"
+
+        elif lang_key == "csharp":
+            # System.Collections.Generic -> System/Collections/Generic.cs
+            return raw_import.replace(".", "/") + ".cs"
+
+        elif lang_key in ["c", "cpp"]:
+            # Already a path (e.g., "myheader.h" or <iostream>)
+            return raw_import
+
+        elif lang_key == "go":
+            if pattern_name == "block_import":
+                # This is the full block content, need to extract individual imports
+                block_imports = re.findall(r'(?:[\w._]\s+)?"([^"]+)"', raw_import)
+                return block_imports if block_imports else None
+            # Single import path
+            return raw_import
+
+        elif lang_key == "rust":
+            if pattern_name == "mod_declaration":
+                # mod foo -> foo.rs or foo/mod.rs
+                return [raw_import + ".rs", raw_import + "/mod.rs"]
+            # std::collections::HashMap -> std/collections/HashMap.rs
+            return raw_import.replace("::", "/") + ".rs"
+
+        elif lang_key == "php":
+            # App\Utils\Logger -> App/Utils/Logger.php
+            return raw_import.replace("\\", "/") + ".php"
+
+        return raw_import
 
     def _detect_python_imports(self, content):
         """Detect Python imports."""

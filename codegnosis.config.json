@@ -1,23 +1,32 @@
 {
   "language_extensions": {
-    ".java": "Java", ".jar": "Java", ".class": "Java",
-    ".cs": "C#", ".csproj": "C#",
-    ".cpp": "C++", ".hpp": "C++", ".h": "C++", ".cc": "C++",
+    ".java": "Java", ".jar": "Java", ".class": "Java", ".jav": "Java", ".j": "Java",
+    ".war": "Java", ".ear": "Java", ".jmod": "Java",
+    ".jsp": "Java Web", ".jspx": "Java Web", ".tld": "Java Web", ".tag": "Java Web",
+    ".cs": "C#", ".csproj": "C#", ".cshtml": "C#", ".csx": "C#", ".cake": "C#",
+    ".xaml": "C#", ".aspx": "C#", ".asmx": "C#", ".ashx": "C#", ".ascx": "C#", ".asax": "C#",
+    ".sln": "C# Solution", ".props": "MSBuild", ".targets": "MSBuild",
+    ".cpp": "C++", ".cc": "C++", ".cxx": "C++", ".c++": "C++", ".cp": "C++",
+    ".hpp": "C++ Header", ".hxx": "C++ Header", ".hh": "C++ Header", ".h++": "C++ Header",
+    ".h": "C/C++ Header", ".inc": "C/C++ Header", ".inl": "C/C++ Header",
+    ".tpp": "C++ Template", ".tcc": "C++ Template",
+    ".c": "C",
     ".go": "Go",
-    ".php": "PHP", ".phtml": "PHP",
     ".rs": "Rust", ".rlib": "Rust",
+    ".php": "PHP", ".phtml": "PHP", ".php3": "PHP", ".php4": "PHP", ".php5": "PHP",
     ".kt": "Kotlin", ".kts": "Kotlin",
     ".lua": "Lua",
     ".rb": "Ruby",
     ".dart": "Dart",
     ".swift": "Swift",
-    ".r": "R",
+    ".r": "R", ".R": "R",
     ".scala": "Scala",
-    ".pl": "Perl",
+    ".pl": "Perl", ".pm": "Perl",
     ".sql": "SQL",
-    ".html": "HTML", ".css": "CSS",
-    ".sh": "Bash/Shell",
-    ".c": "C",
+    ".html": "HTML", ".htm": "HTML",
+    ".css": "CSS", ".scss": "SCSS", ".sass": "SASS", ".less": "Less",
+    ".sh": "Bash/Shell", ".bash": "Bash/Shell", ".zsh": "Bash/Shell",
+    ".ps1": "PowerShell", ".psm1": "PowerShell", ".psd1": "PowerShell",
     ".xlsx": "Spreadsheet", ".ods": "Spreadsheet", ".csv": "CSV"
   },
   "compliance_checks": {
@@ -25,5 +34,122 @@
     "mandatory_files": [],
     "forbidden_licenses": []
   },
-  "custom_regex_parsers": {}
+  "custom_regex_parsers": {
+    "java": [
+      {
+        "pattern_name": "standard_wildcard_import",
+        "regex_pattern": "^\\s*import\\s+([\\w\\.\\*]+);",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "static_import",
+        "regex_pattern": "^\\s*import\\s+static\\s+([\\w\\.\\*]+);",
+        "is_multiline": true,
+        "capture_group": 1
+      }
+    ],
+    "csharp": [
+      {
+        "pattern_name": "namespace_static_import",
+        "regex_pattern": "^\\s*(?:global\\s+)?using\\s+(?:static\\s+)?([\\w\\.]+);",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "alias_directive",
+        "regex_pattern": "^\\s*(?:global\\s+)?using\\s+(\\w+)\\s*=\\s*([\\w\\.]+);",
+        "is_multiline": true,
+        "capture_group": 2
+      }
+    ],
+    "cpp": [
+      {
+        "pattern_name": "angled_include",
+        "regex_pattern": "^\\s*#\\s*include\\s*<([^>]+)>",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "quoted_include",
+        "regex_pattern": "^\\s*#\\s*include\\s*\"([^\"]+)\"",
+        "is_multiline": true,
+        "capture_group": 1
+      }
+    ],
+    "c": [
+      {
+        "pattern_name": "angled_include",
+        "regex_pattern": "^\\s*#\\s*include\\s*<([^>]+)>",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "quoted_include",
+        "regex_pattern": "^\\s*#\\s*include\\s*\"([^\"]+)\"",
+        "is_multiline": true,
+        "capture_group": 1
+      }
+    ],
+    "go": [
+      {
+        "pattern_name": "single_import",
+        "regex_pattern": "^\\s*import\\s+(?:\\w+\\s+)?\"([^\"]+)\"",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "block_import",
+        "regex_pattern": "import\\s*\\(\\s*([\\s\\S]*?)\\s*\\)",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "block_import_line",
+        "regex_pattern": "(?:[\\w._]\\s+)?\"([^\"]+)\"",
+        "is_multiline": false,
+        "capture_group": 1
+      }
+    ],
+    "rust": [
+      {
+        "pattern_name": "simple_use",
+        "regex_pattern": "^\\s*use\\s+([\\w:]+)(?:\\s+as\\s+\\w+)?;",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "grouped_use",
+        "regex_pattern": "^\\s*use\\s+([\\w:]+)::\\{([^\\}]+)\\};",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "mod_declaration",
+        "regex_pattern": "^\\s*(?:pub\\s+)?mod\\s+(\\w+);",
+        "is_multiline": true,
+        "capture_group": 1
+      }
+    ],
+    "php": [
+      {
+        "pattern_name": "namespace_use",
+        "regex_pattern": "^\\s*use\\s+([\\w\\\\]+)(?:\\s+as\\s+\\w+)?;",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "grouped_use",
+        "regex_pattern": "^\\s*use\\s+([\\w\\\\]+)\\\\\\{([^\\}]+)\\};",
+        "is_multiline": true,
+        "capture_group": 1
+      },
+      {
+        "pattern_name": "require_include",
+        "regex_pattern": "^\\s*(?:require|include)(?:_once)?\\s*\\(?\\s*['\"]([^'\"]+)['\"]\\s*\\)?",
+        "is_multiline": true,
+        "capture_group": 1
+      }
+    ]
+  }
 }

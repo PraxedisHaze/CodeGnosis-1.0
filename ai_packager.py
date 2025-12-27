@@ -37,9 +37,23 @@ def package_for_ai(report_data, output_path, project_root):
     files_data = report_data.get('files', {})
     processed_count = 0
     
+    # Files to exclude from bundles (prevent recursive growth)
+    exclude_patterns = [
+        "ai_bundle_",  # Previous AI bundles
+        ".exe",        # Executables
+        ".dll",        # Libraries
+        ".pdb",        # Debug symbols
+        ".log",        # Log files
+    ]
+
     for rel_path, info in files_data.items():
+        # Skip binaries
         if info.get('category') in ["Image", "Video", "Audio", "Font", "Archive", "Executable"]:
-            continue # Skip binaries
+            continue
+
+        # Skip files matching exclude patterns (prevents recursive bundle growth)
+        if any(pattern in rel_path for pattern in exclude_patterns):
+            continue
             
         full_path = project_root / rel_path
         
