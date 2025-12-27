@@ -1,0 +1,5 @@
+# Build-time dependencies for CodeGnosis
+# These are separate from runtime dependencies to prevent drift
+# Used by scripts/build.cjs
+
+pyinstaller>=6.0.0

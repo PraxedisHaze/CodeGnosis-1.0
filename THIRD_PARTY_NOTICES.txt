@@ -1,0 +1,59 @@
+ALETHEARI CODEGNOSIS - THIRD PARTY NOTICES
+=========================================
+
+This project utilizes several open-source libraries. We gratefully acknowledge the contributions of these projects and their maintainers.
+
+---
+
+PYTHON BACKEND:
+---------------
+
+Project: Graphviz
+License: MIT License
+Source: https://github.com/xflr6/graphviz
+
+Project: Rusqlite
+License: MIT License
+Source: https://github.com/rusqlite/rusqlite
+
+Project: Chrono
+License: MIT License / Apache 2.0
+Source: https://github.com/chronotope/chrono
+
+Project: Requests
+License: Apache License 2.0
+Source: https://github.com/psf/requests
+
+---
+
+TAURI / REACT FRONTEND:
+-----------------------
+
+Project: Tauri
+License: MIT License / Apache 2.0
+Source: https://github.com/tauri-apps/tauri
+
+Project: React
+License: MIT License
+Source: https://github.com/facebook/react
+
+Project: Vite
+License: MIT License
+Source: https://github.com/vitejs/vite
+
+Project: TypeScript
+License: Apache License 2.0
+Source: https://github.com/microsoft/TypeScript
+
+Project: Zod
+License: MIT License
+Source: https://github.com/colinhacks/zod
+
+Project: Date-fns
+License: MIT License
+Source: https://github.com/date-fns/date-fns
+
+---
+
+This software is provided "as is", without warranty of any kind.
+Alethéari Constellation - Love First.

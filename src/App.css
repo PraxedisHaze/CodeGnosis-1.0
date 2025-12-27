@@ -1,0 +1,112 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.app-header {
+  background: linear-gradient(135deg, var(--aeth-primary), var(--aeth-secondary));
+  color: white;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.app-main {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--aeth-primary);
+  color: white;
+}
+
+.btn-success {
+  background: var(--aeth-success);
+  color: white;
+}
+
+.project-path {
+  padding: 1rem;
+  background: var(--aeth-border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.results {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: var(--aeth-border);
+  border-radius: 8px;
+}
+
+.results h2 {
+  margin-bottom: 1rem;
+  color: var(--aeth-primary);
+}
+
+.results pre {
+  background: var(--aeth-bg);
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.app-footer {
+  padding: 1rem 2rem;
+  background: var(--aeth-border);
+  text-align: center;
+  font-size: 0.85rem;
+  border-top: 1px solid var(--aeth-primary);
+}
+
+.app-footer code {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--aeth-info);
+}

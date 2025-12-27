@@ -1,0 +1,29 @@
+{
+  "language_extensions": {
+    ".java": "Java", ".jar": "Java", ".class": "Java",
+    ".cs": "C#", ".csproj": "C#",
+    ".cpp": "C++", ".hpp": "C++", ".h": "C++", ".cc": "C++",
+    ".go": "Go",
+    ".php": "PHP", ".phtml": "PHP",
+    ".rs": "Rust", ".rlib": "Rust",
+    ".kt": "Kotlin", ".kts": "Kotlin",
+    ".lua": "Lua",
+    ".rb": "Ruby",
+    ".dart": "Dart",
+    ".swift": "Swift",
+    ".r": "R",
+    ".scala": "Scala",
+    ".pl": "Perl",
+    ".sql": "SQL",
+    ".html": "HTML", ".css": "CSS",
+    ".sh": "Bash/Shell",
+    ".c": "C",
+    ".xlsx": "Spreadsheet", ".ods": "Spreadsheet", ".csv": "CSV"
+  },
+  "compliance_checks": {
+    "required_header_text": "",
+    "mandatory_files": [],
+    "forbidden_licenses": []
+  },
+  "custom_regex_parsers": {}
+}

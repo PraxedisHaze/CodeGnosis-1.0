@@ -1,0 +1,46 @@
+:root {
+  /* Alethéari Color Palette */
+  --aeth-primary: #667eea;
+  --aeth-secondary: #764ba2;
+  --aeth-success: #27AE60;
+  --aeth-warning: #F39C12;
+  --aeth-danger: #E74C3C;
+  --aeth-info: #3498DB;
+
+  --aeth-bg: #1e1e1e;
+  --aeth-fg: #e0e0e0;
+  --aeth-border: #404040;
+
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: var(--aeth-fg);
+  background-color: var(--aeth-bg);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}

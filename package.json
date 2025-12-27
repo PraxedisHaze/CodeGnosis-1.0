@@ -1,0 +1,42 @@
+{
+  "name": "codegnosis",
+  "version": "1.0.0",
+  "description": "A project analysis and visualization tool.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:analyzer": "node scripts/build.cjs",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "npm run build:analyzer && tauri build"
+  },
+  "dependencies": {
+    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "reactflow": "^11.11.4"
+  },
+  "devDependencies": {
+    "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/cli": "^2.9.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DrakeTimothy/CodeGnosis-1.0-READY-TO-SHIP.git"
+  },
+  "keywords": [
+    "project-analyzer",
+    "code-visualization",
+    "dependency-graph",
+    "static-analysis"
+  ],
+  "author": "",
+  "license": "ISC"
+}

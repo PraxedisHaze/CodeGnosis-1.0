@@ -1,0 +1,6 @@
+[build]
+rustflags = ["--cfg", "has_std"]
+
+[features]
+experimental_windows_sandbox = true
+
