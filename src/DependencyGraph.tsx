@@ -140,7 +140,13 @@ const FILE_TYPE_COLORS: Record<string, string> = {
 }
 
 // Draggable, Resizable Legend Component
-function DraggableLegend({ fileTypes }: { fileTypes: Record<string, string> }) {
+interface LegendProps {
+  fileTypes: Record<string, string>
+  highlightedTypes: Set<string>
+  onToggleType: (type: string) => void
+}
+
+function DraggableLegend({ fileTypes, highlightedTypes, onToggleType }: LegendProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [position, setPosition] = useState({ x: 10, y: 10 })
   const [size, setSize] = useState({ width: 180, height: 0 }) // height 0 = auto
@@ -291,25 +297,40 @@ function DraggableLegend({ fileTypes }: { fileTypes: Record<string, string> }) {
           }}>
             {presentTypes.map(type => {
               const color = FILE_TYPE_COLORS[type] || FILE_TYPE_COLORS['Default']
+              const isHighlighted = highlightedTypes.has(type)
               return (
-                <div key={type} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.75rem',
-                  whiteSpace: 'nowrap'
-                }}>
+                <div
+                  key={type}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleType(type)
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.75rem',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    padding: '0.2rem 0.4rem',
+                    borderRadius: '4px',
+                    background: isHighlighted ? 'rgba(255,255,255,0.15)' : 'transparent',
+                    boxShadow: isHighlighted ? `0 0 8px ${color}, 0 0 12px ${color}` : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
                   <div style={{
                     width: '12px',
                     height: '12px',
                     borderRadius: '3px',
                     background: color,
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    flexShrink: 0
+                    border: isHighlighted ? `2px solid white` : '1px solid rgba(255,255,255,0.2)',
+                    flexShrink: 0,
+                    boxShadow: isHighlighted ? `0 0 6px ${color}` : 'none'
                   }} />
                   <span style={{
-                    color: type === 'Unfamiliar' ? '#E74C3C' : 'inherit',
-                    fontWeight: type === 'Unfamiliar' ? 'bold' : 'normal',
+                    color: isHighlighted ? '#fff' : (type === 'Unfamiliar' ? '#E74C3C' : 'inherit'),
+                    fontWeight: isHighlighted || type === 'Unfamiliar' ? 'bold' : 'normal',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis'
                   }}>
@@ -354,7 +375,22 @@ function DraggableLegend({ fileTypes }: { fileTypes: Record<string, string> }) {
 // Inner component that uses ReactFlow hooks
 function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPath }: DependencyGraphProps) {
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const [highlightedTypes, setHighlightedTypes] = useState<Set<string>>(new Set())
+  const [snapToGrid, setSnapToGrid] = useState(false)
   const { fitView } = useReactFlow()
+
+  // Toggle a type in the highlighted set
+  const handleToggleType = useCallback((type: string) => {
+    setHighlightedTypes(prev => {
+      const next = new Set(prev)
+      if (next.has(type)) {
+        next.delete(type)
+      } else {
+        next.add(type)
+      }
+      return next
+    })
+  }, [])
 
   const handleOpenInEditor = async (relativePath: string) => {
     const fullPath = `${projectPath}/${relativePath}`.replace(/\//g, '\\')
@@ -427,8 +463,63 @@ function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPat
     return { nodes, edges }
   }, [dependencyGraph, fileTypes])
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [nodes, setNodesState, onNodesChange] = useNodesState(initialNodes)
+  const [edges, setEdgesState, onEdgesChange] = useEdgesState(initialEdges)
+
+  // Update node/edge styles when highlighted types change
+  useEffect(() => {
+    const hasHighlights = highlightedTypes.size > 0
+
+    setNodesState((nds) =>
+      nds.map((node) => {
+        const fileType = node.data.fileType as string
+        const isHighlighted = hasHighlights && highlightedTypes.has(fileType)
+        const baseColor = FILE_TYPE_COLORS[fileType] || FILE_TYPE_COLORS['Default']
+        const textColor = fileType === 'JavaScript' ? '#000' : '#fff'
+
+        return {
+          ...node,
+          style: {
+            background: baseColor,
+            color: textColor,
+            border: isHighlighted ? '3px solid white' : '2px solid #222',
+            borderRadius: '8px',
+            padding: '10px',
+            fontSize: '12px',
+            width: 200,
+            opacity: hasHighlights ? (isHighlighted ? 1 : 0.25) : 1,
+            boxShadow: isHighlighted ? `0 0 20px ${baseColor}, 0 0 30px ${baseColor}` : 'none',
+            transition: 'all 0.3s ease',
+          },
+        }
+      })
+    )
+
+    setEdgesState((eds) =>
+      eds.map((edge) => {
+        const sourceType = fileTypes[edge.source]
+        const targetType = fileTypes[edge.target]
+        const isHighlighted = hasHighlights && (highlightedTypes.has(sourceType) || highlightedTypes.has(targetType))
+        const highlightColor = highlightedTypes.has(sourceType)
+          ? (FILE_TYPE_COLORS[sourceType] || '#666')
+          : (FILE_TYPE_COLORS[targetType] || '#666')
+
+        return {
+          ...edge,
+          animated: isHighlighted,
+          style: {
+            stroke: isHighlighted ? highlightColor : '#666',
+            strokeWidth: isHighlighted ? 3 : 1,
+            opacity: hasHighlights ? (isHighlighted ? 1 : 0.15) : 1,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isHighlighted ? highlightColor : '#666',
+          },
+        }
+      })
+    )
+  }, [highlightedTypes, fileTypes, setNodesState, setEdgesState])
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     setSelectedNode(node.id)
@@ -444,8 +535,16 @@ function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPat
       width: '100%',
       height: '600px',
     }}>
-      {/* Draggable Legend - floats above everything */}
-      <DraggableLegend fileTypes={fileTypes} />
+      {/* Draggable Legend - floats above everything, even outside container */}
+      <div style={{ position: 'fixed', zIndex: 9999, pointerEvents: 'none' }}>
+        <div style={{ pointerEvents: 'auto' }}>
+          <DraggableLegend
+            fileTypes={fileTypes}
+            highlightedTypes={highlightedTypes}
+            onToggleType={handleToggleType}
+          />
+        </div>
+      </div>
 
       <div style={{
         display: 'flex',
@@ -461,31 +560,57 @@ function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPat
         transition: 'flex 0.3s ease',
         position: 'relative'
       }}>
-        {/* Fit View Button - recovers lost graph */}
-        <button
-          onClick={() => fitView({ padding: 0.2, duration: 300 })}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            zIndex: 1000,
-            padding: '0.5rem 0.75rem',
-            background: 'rgba(30, 30, 30, 0.9)',
-            border: '1px solid var(--aeth-border)',
-            borderRadius: '6px',
-            color: 'var(--aeth-fg)',
-            cursor: 'pointer',
-            fontSize: '0.8rem',
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-          }}
-          title="Reset view to fit all nodes (recovers lost graph)"
-        >
-          <span>⟲</span> Fit View
-        </button>
+        {/* Graph Control Buttons */}
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          right: '10px',
+          zIndex: 1000,
+          display: 'flex',
+          gap: '0.5rem'
+        }}>
+          <button
+            onClick={() => setSnapToGrid(!snapToGrid)}
+            style={{
+              padding: '0.5rem 0.75rem',
+              background: snapToGrid ? 'var(--aeth-primary)' : 'rgba(30, 30, 30, 0.9)',
+              border: '1px solid var(--aeth-border)',
+              borderRadius: '6px',
+              color: 'var(--aeth-fg)',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              transition: 'background 0.2s ease'
+            }}
+            title={snapToGrid ? "Disable snap to grid" : "Enable snap to grid"}
+          >
+            <span>⊞</span> Snap {snapToGrid ? 'ON' : 'OFF'}
+          </button>
+          <button
+            onClick={() => fitView({ padding: 0.2, duration: 300 })}
+            style={{
+              padding: '0.5rem 0.75rem',
+              background: 'rgba(30, 30, 30, 0.9)',
+              border: '1px solid var(--aeth-border)',
+              borderRadius: '6px',
+              color: 'var(--aeth-fg)',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+            }}
+            title="Reset view to fit all nodes (recovers lost graph)"
+          >
+            <span>⟲</span> Fit View
+          </button>
+        </div>
 
         <ReactFlow
           nodes={nodes}
@@ -499,6 +624,8 @@ function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPat
           panOnScroll={true}
           panOnScrollMode="vertical"
           zoomActivationKeyCode="Control"
+          snapToGrid={snapToGrid}
+          snapGrid={[20, 20]}
         >
           <Background />
           <Controls />
@@ -547,10 +674,11 @@ function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPat
           </button>
 
           <h3 style={{
-            marginTop: 0,
+            marginTop: '10px',
             marginBottom: '0.5rem',
             fontSize: '1rem',
-            wordBreak: 'break-word'
+            wordBreak: 'break-word',
+            paddingRight: '2rem'
           }}>
             {selectedNode}
           </h3>
