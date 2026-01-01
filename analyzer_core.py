@@ -255,18 +255,26 @@ class AnalyzerCore:
         files = self._find_files()
         self.logger.info(f"Scan complete: {len(files)} files after excludes")
 
+        # PASS 1: Collect all files first (so we know what exists)
         for file_path in files:
             rel_path = self._get_relpath(file_path)
             category = self._categorize(file_path)
-
             self.file_types[rel_path] = category
             self.file_graph[rel_path] = []
 
+        self.logger.info(f"Pass 1 complete: {len(self.file_types)} files registered")
+
+        # PASS 2: Now resolve dependencies (all files are known)
+        for file_path in files:
+            rel_path = self._get_relpath(file_path)
             deps = self._detect_dependencies(file_path)
+            self.logger.info(f"File {rel_path}: detected {len(deps)} raw imports: {deps[:5]}...")
             for dep in deps:
                 resolved = self._resolve_path(file_path, dep)
+                self.logger.info(f"  Import '{dep}' -> resolved: {resolved}")
                 if resolved and resolved in self.file_types:
                     self.file_graph[rel_path].append(resolved)
+                    self.logger.info(f"    ADDED connection: {rel_path} -> {resolved}")
 
         self.logger.info("Dependency graph built; analyzing connectivity")
         self._analyze_connectivity(files)
@@ -823,20 +831,35 @@ class AnalyzerCore:
         if not ref_str:
             return None
 
+        # Skip external packages (no ./ or ../ prefix and no extension)
+        if not ref_str.startswith('.') and '/' not in ref_str and not Path(ref_str).suffix:
+            return None  # External package like 'react', 'three', etc.
+
         current_dir = Path(from_file).parent
-        candidates = [current_dir / ref_str, self.project_dir / ref_str]
+        candidates = []
 
-        if not Path(ref_str).suffix:
-            for ext in [".js", ".jsx", ".ts", ".tsx", ".json", ".py", ".cjs"]:
-                candidates.append(current_dir / (ref_str + ext))
-                candidates.append(self.project_dir / (ref_str + ext))
-
+        # Handle relative paths first
         if ref_str.startswith("./") or ref_str.startswith("../"):
             try:
                 resolved = (current_dir / ref_str).resolve()
                 candidates.append(resolved)
             except:
                 pass
+
+        # Add direct candidates
+        candidates.extend([current_dir / ref_str, self.project_dir / ref_str])
+
+        # Try with extensions if no suffix
+        extensions = [".ts", ".tsx", ".js", ".jsx", ".json", ".py", ".cjs", ".mjs"]
+        if not Path(ref_str).suffix:
+            for ext in extensions:
+                candidates.append(current_dir / (ref_str + ext))
+                candidates.append(self.project_dir / (ref_str + ext))
+
+            # Try index files (critical for folder imports)
+            for ext in extensions:
+                candidates.append(current_dir / ref_str / f"index{ext}")
+                candidates.append(self.project_dir / ref_str / f"index{ext}")
 
         for candidate in candidates:
             try:
@@ -1085,6 +1108,22 @@ class AnalyzerCore:
         if "requirements.txt" in files or "setup.py" in files:
             frameworks.add("Python")
 
+        # Detect Tauri
+        if any("src-tauri/tauri.conf.json" in f for f in files):
+            # Check if Tauri 2
+            tauri_conf_path = self.project_dir / "src-tauri" / "tauri.conf.json"
+            if tauri_conf_path.exists():
+                try:
+                    with open(tauri_conf_path, 'r', encoding='utf-8') as f:
+                        tauri_conf = json.load(f)
+                    schema = tauri_conf.get("$schema", "")
+                    if "schema.tauri.app/config/2" in schema:
+                        frameworks.add("Tauri 2")
+                    else:
+                        frameworks.add("Tauri 1.x")
+                except Exception:
+                    frameworks.add("Tauri")
+
         return sorted(list(frameworks))
 
     def _detect_project_type(self, file_types, entry_points):
@@ -1111,6 +1150,183 @@ class AnalyzerCore:
             return "Static Website"
         else:
             return "Mixed/Unknown"
+
+    def _check_tauri_permissions(self):
+        """
+        Check Tauri 2 projects for permission/capability issues.
+        Returns list of health warnings for Tauri-specific problems.
+        """
+        warnings = []
+
+        # Check if this is a Tauri 2 project
+        tauri_conf_path = self.project_dir / "src-tauri" / "tauri.conf.json"
+        if not tauri_conf_path.exists():
+            return warnings  # Not a Tauri project
+
+        try:
+            with open(tauri_conf_path, 'r', encoding='utf-8') as f:
+                tauri_conf = json.load(f)
+        except Exception as e:
+            warnings.append({
+                "type": "tauri_config_error",
+                "file": "src-tauri/tauri.conf.json",
+                "reason": f"Failed to parse tauri.conf.json: {e}",
+                "severity": "high"
+            })
+            return warnings
+
+        # Check if Tauri 2 (has schema v2)
+        schema = tauri_conf.get("$schema", "")
+        is_tauri_2 = "schema.tauri.app/config/2" in schema
+
+        if not is_tauri_2:
+            return warnings  # Tauri 1.x doesn't need these checks
+
+        # Get windows from config
+        app_config = tauri_conf.get("app", {})
+        windows = app_config.get("windows", [])
+        window_labels = [w.get("label", "main") for w in windows]
+
+        # Check for withGlobalTauri setting
+        has_global_tauri = app_config.get("withGlobalTauri", False)
+
+        # Find static HTML files that use Tauri IPC
+        static_html_with_tauri = []
+        for file_path, category in self.file_types.items():
+            if category == "HTML" and "public/" in file_path:
+                full_path = self.project_dir / file_path
+                try:
+                    with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+
+                    # Check for Tauri IPC usage patterns
+                    uses_tauri = any(pattern in content for pattern in [
+                        "window.__TAURI__",
+                        "__TAURI__",
+                        "@tauri-apps/api",
+                        "invoke(",
+                        ".listen(",
+                        ".emit("
+                    ])
+
+                    if uses_tauri:
+                        static_html_with_tauri.append(file_path)
+                except Exception:
+                    pass
+
+        # Warn if static HTML uses Tauri but withGlobalTauri not set
+        if static_html_with_tauri and not has_global_tauri:
+            warnings.append({
+                "type": "tauri_missing_global_tauri",
+                "files": static_html_with_tauri,
+                "reason": "Static HTML files use window.__TAURI__ but 'withGlobalTauri: true' not set in app config. IPC calls will fail.",
+                "fix": "Add '\"withGlobalTauri\": true' to app section of tauri.conf.json",
+                "severity": "high"
+            })
+
+        # Check capabilities
+        capabilities_dir = self.project_dir / "src-tauri" / "capabilities"
+        if not capabilities_dir.exists():
+            warnings.append({
+                "type": "tauri_no_capabilities",
+                "reason": "Tauri 2 project missing capabilities directory. Windows may lack required permissions.",
+                "fix": "Create src-tauri/capabilities/default.json with required permissions",
+                "severity": "medium"
+            })
+        else:
+            # Parse capabilities and check coverage
+            capabilities = {}
+            for cap_file in capabilities_dir.glob("*.json"):
+                try:
+                    with open(cap_file, 'r', encoding='utf-8') as f:
+                        cap_data = json.load(f)
+                    cap_name = cap_data.get("identifier", cap_file.stem)
+                    capabilities[cap_name] = cap_data
+                except Exception:
+                    pass
+
+            # Check if all windows are covered by capabilities
+            covered_windows = set()
+            all_permissions = set()
+            for cap_name, cap_data in capabilities.items():
+                cap_windows = cap_data.get("windows", [])
+                covered_windows.update(cap_windows)
+                all_permissions.update(cap_data.get("permissions", []))
+
+            uncovered = set(window_labels) - covered_windows
+            if uncovered:
+                warnings.append({
+                    "type": "tauri_uncovered_windows",
+                    "windows": list(uncovered),
+                    "reason": f"Windows {list(uncovered)} not listed in any capability file. They may lack IPC access.",
+                    "severity": "medium"
+                })
+
+            # Scan frontend for IPC usage and check permissions
+            ipc_usage = self._scan_tauri_ipc_usage()
+
+            # Check for missing event permissions
+            if ipc_usage.get("uses_listen") and "core:event:allow-listen" not in all_permissions:
+                warnings.append({
+                    "type": "tauri_missing_permission",
+                    "permission": "core:event:allow-listen",
+                    "reason": "Frontend uses event.listen() but permission not granted in capabilities",
+                    "severity": "high"
+                })
+
+            if ipc_usage.get("uses_emit") and "core:event:allow-emit" not in all_permissions:
+                warnings.append({
+                    "type": "tauri_missing_permission",
+                    "permission": "core:event:allow-emit",
+                    "reason": "Frontend uses event.emit() but permission not granted in capabilities",
+                    "severity": "high"
+                })
+
+        return warnings
+
+    def _scan_tauri_ipc_usage(self):
+        """Scan frontend files for Tauri IPC usage patterns."""
+        usage = {
+            "uses_invoke": False,
+            "uses_listen": False,
+            "uses_emit": False,
+            "invoke_commands": [],
+            "listen_events": [],
+        }
+
+        frontend_extensions = [".ts", ".tsx", ".js", ".jsx", ".html"]
+
+        for file_path, category in self.file_types.items():
+            ext = Path(file_path).suffix.lower()
+            if ext not in frontend_extensions:
+                continue
+
+            full_path = self.project_dir / file_path
+            try:
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+
+                # Check invoke usage
+                if "invoke(" in content or ".invoke(" in content:
+                    usage["uses_invoke"] = True
+                    # Extract command names
+                    invoke_matches = re.findall(r"invoke\(['\"](\w+)['\"]", content)
+                    usage["invoke_commands"].extend(invoke_matches)
+
+                # Check listen usage
+                if ".listen(" in content or "listen(" in content:
+                    usage["uses_listen"] = True
+                    listen_matches = re.findall(r"listen\(['\"]([^'\"]+)['\"]", content)
+                    usage["listen_events"].extend(listen_matches)
+
+                # Check emit usage
+                if ".emit(" in content or "emit(" in content:
+                    usage["uses_emit"] = True
+
+            except Exception:
+                pass
+
+        return usage
 
     def generate_analysis_report(self):
         """Compiles all analysis data into a single JSON-ready report."""
@@ -1168,6 +1384,10 @@ class AnalyzerCore:
                     "severity": "low",
                 }
             )
+
+        # Tauri 2 permission checks
+        tauri_warnings = self._check_tauri_permissions()
+        health_warnings.extend(tauri_warnings)
 
         # Build detailed file info
         detailed_files = {}

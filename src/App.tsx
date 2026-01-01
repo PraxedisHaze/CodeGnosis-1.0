@@ -2,7 +2,12 @@
 import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
+import { writeTextFile } from '@tauri-apps/plugin-fs'
+import { join } from '@tauri-apps/api/path'
 import DependencyGraph from './DependencyGraph'
+import { SettingsModal } from './components/SettingsModal'
+import { TabInterface } from './components/TabInterface'
+import { LoomGraph } from './components/LoomGraph'
 import './App.css'
 
 function App() {
@@ -10,6 +15,15 @@ function App() {
   const [analysisResult, setAnalysisResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sidebarPosition, setSidebarPosition] = useState<'left' | 'right'>('left')
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'analysis' | 'graph'>('analysis')
+  const [settings, setSettings] = useState({
+    theme: 'Dark',
+    excluded: 'node_modules,.git,dist,build',
+    deepScan: true,
+    autoSave: true
+  })
 
   const selectDirectory = async () => {
     try {
@@ -41,11 +55,31 @@ function App() {
       const result = await invoke('analyze', {
         projectPath,
         extensions: '',  // Empty = analyze all files
-        excluded: 'node_modules,.git,dist,build',
-        theme: 'Dark'
+        excluded: settings.excluded,
+        theme: settings.theme
       })
       setAnalysisResult(result)
       console.log('[CodeGnosis] Analysis complete:', result)
+
+      // Auto-save analysis to ai-bundle.json in the project directory
+      if (settings.autoSave) {
+        try {
+          const bundlePath = await join(projectPath, 'ai-bundle.json')
+          const bundleData = {
+            _meta: {
+              generator: 'CodeGnosis',
+              version: '1.0.0',
+              generatedAt: new Date().toISOString(),
+              projectPath: projectPath
+            },
+            ...result
+          }
+          await writeTextFile(bundlePath, JSON.stringify(bundleData, null, 2))
+          console.log('[CodeGnosis] Saved ai-bundle.json to:', bundlePath)
+        } catch (saveErr) {
+          console.warn('[CodeGnosis] Could not save ai-bundle.json:', saveErr)
+        }
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
       console.error('[CodeGnosis] Analysis failed:', err)
@@ -56,16 +90,45 @@ function App() {
   }
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>CodeGnosis</h1>
-        <p className="subtitle">Project Analyzer Star</p>
-      </header>
+    <div className={`app app-with-sidebar ${sidebarPosition === 'right' ? 'sidebar-right' : ''}`}>
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <h1>CodeGnosis</h1>
+          <p className="subtitle">Project Analyzer Star</p>
+          <div className="header-actions">
+            <button
+              className="btn-icon"
+              onClick={() => setIsSettingsOpen(true)}
+              title="Open Engine Configuration"
+            >
+              ⚙️
+            </button>
+            <button
+              className="btn-toggle-side"
+              onClick={() => setSidebarPosition(p => p === 'left' ? 'right' : 'left')}
+              title={`Move sidebar to ${sidebarPosition === 'left' ? 'right' : 'left'}`}
+            >
+              {sidebarPosition === 'left' ? '→' : '←'}
+            </button>
+          </div>
+        </div>
 
-      <main className="app-main">
-        <div className="controls">
-          <button onClick={selectDirectory} className="btn btn-primary">
+        <div className="sidebar-controls">
+          <button
+            onClick={selectDirectory}
+            disabled={!!analysisResult}
+            className="btn btn-primary btn-full"
+          >
             Select Directory
+          </button>
+
+          <button
+            onClick={analyzeProject}
+            disabled={!projectPath || loading || !!analysisResult}
+            className="btn btn-success btn-full"
+          >
+            {loading ? 'Analyzing...' : 'Analyze Project'}
           </button>
 
           <button
@@ -74,38 +137,67 @@ function App() {
               setAnalysisResult(null)
               setError(null)
             }}
-            className="btn btn-secondary"
-            style={{ marginLeft: '0.5rem' }}
+            className="btn btn-secondary btn-full"
           >
             Reset
           </button>
-
-          {projectPath && (
-            <div className="project-path">
-              <strong>Project:</strong> {projectPath}
-            </div>
-          )}
-
-          {error && (
-            <div className="error-message" style={{
-              padding: '1rem',
-              background: '#ff4444',
-              color: 'white',
-              borderRadius: '8px',
-              marginTop: '1rem'
-            }}>
-              <strong>Error:</strong> {error}
-            </div>
-          )}
-
-          <button
-            onClick={analyzeProject}
-            disabled={!projectPath || loading}
-            className="btn btn-success"
-          >
-            {loading ? 'Analyzing...' : 'Generate Visual Chart'}
-          </button>
         </div>
+
+        {projectPath && (
+          <div className="sidebar-section">
+            <h3>Project</h3>
+            <div className="project-path-sidebar">
+              {projectPath.split(/[/\\]/).pop()}
+            </div>
+            <div className="project-path-full" title={projectPath}>
+              {projectPath}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="sidebar-error">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {analysisResult && (
+          <div className="sidebar-section">
+            <h3>Quick Stats</h3>
+            <div className="sidebar-stats">
+              <div className="sidebar-stat">
+                <span className="stat-value">{analysisResult.summary?.totalFiles || 0}</span>
+                <span className="stat-label">Files</span>
+              </div>
+              <div className="sidebar-stat">
+                <span className="stat-value">{analysisResult.summary?.totalConnections || 0}</span>
+                <span className="stat-label">Connections</span>
+              </div>
+              <div className="sidebar-stat">
+                <span className="stat-value" style={{
+                  color: (analysisResult.statistics?.connectivityHealthScore || 0) >= 80 ? '#4CAF50' :
+                         (analysisResult.statistics?.connectivityHealthScore || 0) >= 60 ? '#FF9800' : '#f44336'
+                }}>{analysisResult.statistics?.connectivityHealthScore || 0}</span>
+                <span className="stat-label">Health</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="sidebar-footer">
+          <p>Keystone Constellation</p>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="main-content">
+        
+        {analysisResult && !loading && (
+          <TabInterface 
+            activeTab={activeTab} 
+            onTabChange={(tab) => setActiveTab(tab)} 
+          />
+        )}
 
         {loading && (
           <div className="loading" style={{
@@ -170,7 +262,21 @@ function App() {
           </div>
         )}
 
-        {analysisResult && (
+        {analysisResult && activeTab === 'graph' && (
+          <div className="loom-wrapper" style={{ padding: '1rem' }}>
+            <h2 style={{ marginBottom: '1rem' }}>The Loom</h2>
+            <LoomGraph
+              dependencyGraph={analysisResult.dependencyGraph || {}}
+              fileTypes={Object.fromEntries(
+                Object.entries(analysisResult.files || {}).map(([file, data]: [string, any]) => [file, data.category])
+              )}
+              allFiles={analysisResult.files || {}}
+              onNodeClick={(file) => console.log('Selected:', file)}
+            />
+          </div>
+        )}
+
+        {analysisResult && activeTab === 'analysis' && (
           <div className="results">
             <h2>Analysis Results</h2>
 
@@ -335,44 +441,6 @@ function App() {
               </div>
             )}
 
-            {/* Interactive Dependency Graph */}
-            <div style={{marginBottom: '2rem'}}>
-              <h3 style={{margin: '0 0 1rem 0', fontSize: '1.2rem'}}>🗺️ Dependency Graph</h3>
-
-              {analysisResult.graphSkipReason && (
-                <div style={{
-                  marginBottom: '1rem',
-                  padding: '0.75rem 1rem',
-                  background: '#ff980026',
-                  border: '1px solid #FF9800',
-                  borderRadius: '8px',
-                  color: '#d35400'
-                }}>
-                  {analysisResult.graphSkipReason}
-                </div>
-              )}
-
-              {analysisResult.dependencyGraph && analysisResult.files ? (
-                <>
-                  <div style={{fontSize: '0.85rem', opacity: 0.7, marginBottom: '1rem'}}>
-                    Interactive visualization - drag nodes, zoom, pan. Colors represent file types.
-                  </div>
-                  <DependencyGraph
-                    dependencyGraph={analysisResult.dependencyGraph}
-                    fileTypes={Object.fromEntries(
-                      Object.entries(analysisResult.files).map(([file, data]: [string, any]) => [file, data.category])
-                    )}
-                    allFiles={analysisResult.files}
-                    projectPath={projectPath}
-                  />
-                </>
-              ) : (
-                <div style={{fontSize: '0.9rem', opacity: 0.7}}>
-                  No dependency graph available for this analysis. Check the JSON output for details.
-                </div>
-              )}
-            </div>
-
             {/* Full JSON Collapsed */}
             <details style={{marginTop: '1rem'}}>
               <summary style={{cursor: 'pointer', padding: '0.5rem', background: 'var(--aeth-border)', borderRadius: '4px'}}>
@@ -384,12 +452,26 @@ function App() {
             </details>
           </div>
         )}
+
+        {/* Empty state when no analysis */}
+        {!loading && !analysisResult && (
+          <div className="empty-state">
+            <div className="empty-state-icon">📂</div>
+            <h2>Select a Project</h2>
+            <p>Choose a directory and click "Analyze Project" to visualize its structure</p>
+          </div>
+        )}
       </main>
 
-      <footer className="app-footer">
-        <p>Part of the Alethéari Constellation</p>
-        <code>window.AETH.version: {window.AETH?.version}</code>
-      </footer>
+      <SettingsModal 
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSave={(newSettings) => {
+          setSettings(newSettings)
+          setIsSettingsOpen(false)
+        }}
+        initialSettings={settings}
+      />
     </div>
   )
 }

@@ -11,6 +11,9 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
   MarkerType,
+  useOnViewportChange,
+  getNodesBounds,
+  Viewport,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
@@ -151,10 +154,13 @@ function DraggableLegend({ fileTypes, highlightedTypes, onToggleType }: LegendPr
   const [position, setPosition] = useState({ x: 10, y: 10 })
   const [size, setSize] = useState({ width: 180, height: 0 }) // height 0 = auto
   const [isDragging, setIsDragging] = useState(false)
+  const [hasDragged, setHasDragged] = useState(false) // Track if actual drag occurred
   const [isResizing, setIsResizing] = useState(false)
   const dragOffset = useRef({ x: 0, y: 0 })
+  const dragStart = useRef({ x: 0, y: 0 }) // Track start position for threshold
   const resizeStart = useRef({ x: 0, y: 0, width: 0, height: 0 })
   const legendRef = useRef<HTMLDivElement>(null)
+  const DRAG_THRESHOLD = 4 // pixels before considered a drag
 
   // Get unique file types present in this graph
   const presentTypes = useMemo(() => {
@@ -174,10 +180,12 @@ function DraggableLegend({ fileTypes, highlightedTypes, onToggleType }: LegendPr
     if ((e.target as HTMLElement).closest('.legend-resize-handle')) return
 
     setIsDragging(true)
+    setHasDragged(false) // Reset drag detection
     dragOffset.current = {
       x: e.clientX - position.x,
       y: e.clientY - position.y
     }
+    dragStart.current = { x: e.clientX, y: e.clientY }
   }
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
@@ -194,6 +202,12 @@ function DraggableLegend({ fileTypes, highlightedTypes, onToggleType }: LegendPr
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
+        // Check if we've exceeded the drag threshold
+        const dx = Math.abs(e.clientX - dragStart.current.x)
+        const dy = Math.abs(e.clientY - dragStart.current.y)
+        if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+          setHasDragged(true)
+        }
         setPosition({
           x: e.clientX - dragOffset.current.x,
           y: e.clientY - dragOffset.current.y
@@ -234,10 +248,10 @@ function DraggableLegend({ fileTypes, highlightedTypes, onToggleType }: LegendPr
       ref={legendRef}
       onMouseDown={handleMouseDown}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         left: position.x,
         top: position.y,
-        zIndex: 1000,
+        zIndex: 9999,
         background: 'rgba(30, 30, 30, 0.95)',
         border: '1px solid var(--aeth-border)',
         borderRadius: '8px',
@@ -303,7 +317,10 @@ function DraggableLegend({ fileTypes, highlightedTypes, onToggleType }: LegendPr
                   key={type}
                   onClick={(e) => {
                     e.stopPropagation()
-                    onToggleType(type)
+                    // Only toggle if we didn't drag (threshold: 4px)
+                    if (!hasDragged) {
+                      onToggleType(type)
+                    }
                   }}
                   style={{
                     display: 'flex',
@@ -377,7 +394,94 @@ function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPat
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [highlightedTypes, setHighlightedTypes] = useState<Set<string>>(new Set())
   const [snapToGrid, setSnapToGrid] = useState(false)
-  const { fitView } = useReactFlow()
+  const [boundingBox, setBoundingBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
+  const { fitView, getNodes, setViewport, getViewport } = useReactFlow()
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Calculate bounding box of all nodes and constrain viewport
+  const updateBoundingBox = useCallback(() => {
+    const nodes = getNodes()
+    if (nodes.length === 0) return
+
+    const bounds = getNodesBounds(nodes)
+    const padding = 50 // padding around nodes
+    setBoundingBox({
+      x: bounds.x - padding,
+      y: bounds.y - padding,
+      width: bounds.width + padding * 2,
+      height: bounds.height + padding * 2,
+    })
+  }, [getNodes])
+
+  // Update bounding box when nodes change
+  useEffect(() => {
+    updateBoundingBox()
+  }, [updateBoundingBox])
+
+  // Constrain viewport so at least one corner of bounding box is 5% inside viewport
+  useOnViewportChange({
+    onEnd: useCallback((viewport: Viewport) => {
+      if (!boundingBox || !containerRef.current) return
+
+      const container = containerRef.current
+      const viewportWidth = container.clientWidth
+      const viewportHeight = container.clientHeight
+      const margin = 0.05 // 5% margin
+
+      // Convert bounding box corners to screen coordinates
+      const { x: vx, y: vy, zoom } = viewport
+      const boxScreenLeft = boundingBox.x * zoom + vx
+      const boxScreenRight = (boundingBox.x + boundingBox.width) * zoom + vx
+      const boxScreenTop = boundingBox.y * zoom + vy
+      const boxScreenBottom = (boundingBox.y + boundingBox.height) * zoom + vy
+
+      // Define the "safe zone" (5% inward from edges)
+      const safeLeft = viewportWidth * margin
+      const safeRight = viewportWidth * (1 - margin)
+      const safeTop = viewportHeight * margin
+      const safeBottom = viewportHeight * (1 - margin)
+
+      // Check if any corner of the bounding box is in the safe zone
+      const corners = [
+        { x: boxScreenLeft, y: boxScreenTop },     // top-left
+        { x: boxScreenRight, y: boxScreenTop },    // top-right
+        { x: boxScreenLeft, y: boxScreenBottom },  // bottom-left
+        { x: boxScreenRight, y: boxScreenBottom }, // bottom-right
+      ]
+
+      const anyCornerVisible = corners.some(corner =>
+        corner.x >= safeLeft && corner.x <= safeRight &&
+        corner.y >= safeTop && corner.y <= safeBottom
+      )
+
+      // If no corner is visible, snap the nearest corner into view
+      if (!anyCornerVisible) {
+        let newVx = vx
+        let newVy = vy
+
+        // Find how far out of bounds we are and correct
+        if (boxScreenRight < safeLeft) {
+          // Graph is too far left - move it right
+          newVx = vx + (safeLeft - boxScreenRight) + 20
+        } else if (boxScreenLeft > safeRight) {
+          // Graph is too far right - move it left
+          newVx = vx - (boxScreenLeft - safeRight) - 20
+        }
+
+        if (boxScreenBottom < safeTop) {
+          // Graph is too far up - move it down
+          newVy = vy + (safeTop - boxScreenBottom) + 20
+        } else if (boxScreenTop > safeBottom) {
+          // Graph is too far down - move it up
+          newVy = vy - (boxScreenTop - safeBottom) - 20
+        }
+
+        if (newVx !== vx || newVy !== vy) {
+          setViewport({ x: newVx, y: newVy, zoom }, { duration: 200 })
+        }
+      }
+    }, [boundingBox, setViewport])
+  })
 
   // Toggle a type in the highlighted set
   const handleToggleType = useCallback((type: string) => {
@@ -530,29 +634,28 @@ function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPat
   const selectedImportedBy = selectedFileData?.importedBy || []
 
   return (
-    <div style={{
-      position: 'relative',
-      width: '100%',
-      height: '600px',
-    }}>
-      {/* Draggable Legend - floats above everything, even outside container */}
-      <div style={{ position: 'fixed', zIndex: 9999, pointerEvents: 'none' }}>
-        <div style={{ pointerEvents: 'auto' }}>
-          <DraggableLegend
-            fileTypes={fileTypes}
-            highlightedTypes={highlightedTypes}
-            onToggleType={handleToggleType}
-          />
-        </div>
-      </div>
+    <div
+      ref={containerRef}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '600px',
+      }}>
+      {/* Draggable Legend - floats above everything */}
+      <DraggableLegend
+        fileTypes={fileTypes}
+        highlightedTypes={highlightedTypes}
+        onToggleType={handleToggleType}
+      />
 
-      <div style={{
+      <div className="graph-container" style={{
         display: 'flex',
         width: '100%',
         height: '100%',
-        border: '1px solid var(--aeth-border)',
-        borderRadius: '8px',
-        overflow: 'hidden'
+        border: '3px solid var(--aeth-primary)',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        boxShadow: '0 0 20px rgba(102, 126, 234, 0.2), inset 0 0 60px rgba(0,0,0,0.3)'
       }}>
       {/* Graph */}
       <div style={{
@@ -615,7 +718,11 @@ function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPat
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={(changes) => {
+            onNodesChange(changes)
+            // Update bounding box after node positions change
+            setTimeout(updateBoundingBox, 0)
+          }}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
           fitView
@@ -627,6 +734,38 @@ function DependencyGraphInner({ dependencyGraph, fileTypes, allFiles, projectPat
           snapToGrid={snapToGrid}
           snapGrid={[20, 20]}
         >
+          {/* Visual bounding box - slightly darker than background */}
+          {boundingBox && (
+            <svg
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                overflow: 'visible',
+              }}
+            >
+              <defs>
+                <filter id="boundingBoxShadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="rgba(102, 126, 234, 0.3)" />
+                </filter>
+              </defs>
+              <rect
+                x={boundingBox.x}
+                y={boundingBox.y}
+                width={boundingBox.width}
+                height={boundingBox.height}
+                fill="rgba(0, 0, 0, 0.15)"
+                stroke="rgba(102, 126, 234, 0.4)"
+                strokeWidth="2"
+                strokeDasharray="8 4"
+                rx="8"
+                filter="url(#boundingBoxShadow)"
+              />
+            </svg>
+          )}
           <Background />
           <Controls />
           <MiniMap
