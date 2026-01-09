@@ -1,7 +1,19 @@
-use std::process::Command;
+use std::fs;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::path::PathBuf;
+use std::process::Command;
+use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
+use tauri::{Manager, State};
+
+#[derive(Debug, Deserialize)]
+struct AnalyzerOutput {
+    #[serde(rename = "resultFile")]
+    result_file: Option<String>,
+    // Fallback for direct result (backwards compat)
+    #[serde(flatten)]
+    direct_result: Option<AnalysisResult>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AnalysisResult {
@@ -24,6 +36,37 @@ struct AnalysisResult {
     graph_image_path: Option<String>,
     #[serde(rename = "graphImageFormat")]
     graph_image_format: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ProgressSnapshot {
+    stage: String,
+    percent: u8,
+    message: String,
+    timestamp: String,
+}
+
+struct ProgressFileState(Mutex<Option<PathBuf>>);
+
+impl ProgressFileState {
+    fn new() -> Self {
+        ProgressFileState(Mutex::new(None))
+    }
+
+    fn set_path(&self, path: Option<PathBuf>) {
+        let mut guard = self.0.lock().unwrap();
+        *guard = path;
+    }
+
+    fn current_path(&self) -> Option<PathBuf> {
+        let guard = self.0.lock().unwrap();
+        guard.clone()
+    }
+
+    fn take_path(&self) -> Option<PathBuf> {
+        let mut guard = self.0.lock().unwrap();
+        guard.take()
+    }
 }
 
 fn find_bundled_analyzer(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -133,8 +176,32 @@ fn find_python_executable() -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_analysis_progress(state: State<'_, ProgressFileState>) -> Result<Option<ProgressSnapshot>, String> {
+    if let Some(path) = state.current_path() {
+        match fs::read_to_string(&path) {
+            Ok(contents) => {
+                let snapshot: ProgressSnapshot = serde_json::from_str(&contents)
+                    .map_err(|e| format!("Failed to parse progress JSON: {}", e))?;
+                Ok(Some(snapshot))
+            }
+            Err(_) => Ok(None),
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+fn cleanup_progress_file(state: &State<'_, ProgressFileState>, path: &PathBuf) {
+    state.take_path();
+    if let Err(e) = fs::remove_file(path) {
+        log::warn!("Failed to remove progress file: {}", e);
+    }
+}
+
+#[tauri::command]
 async fn analyze(
     app_handle: tauri::AppHandle,
+    state: State<'_, ProgressFileState>,
     project_path: String,
     extensions: Option<String>,
     excluded: Option<String>,
@@ -149,29 +216,28 @@ async fn analyze(
     let excluded_cloned = excluded_str.clone();
     let theme_cloned = theme_str.clone();
 
+    let progress_path = {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_micros())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("codegnosis_progress_{}.json", timestamp))
+    };
+    if let Err(e) = fs::File::create(&progress_path) {
+        log::warn!("Failed to create progress file: {}", e);
+    }
+    state.set_path(Some(progress_path.clone()));
+    let progress_arg = progress_path.to_string_lossy().to_string();
+
     let output = tauri::async_runtime::spawn_blocking(move || {
-        // Prefer bundled analyzer even in dev; fallback to Python only if missing.
-        if let Ok(exe_path) = find_bundled_analyzer(&app_handle) {
-            log::info!("Running bundled analyzer: {}", exe_path.display());
-            run_with_timeout(
-                {
-                    let mut cmd = Command::new(&exe_path);
-                    cmd.arg(&project_path_cloned)
-                        .arg(&extensions_cloned)
-                        .arg(&excluded_cloned)
-                        .arg(&theme_cloned)
-                        .arg("json");
-                    cmd
-                },
-                240,
-            )
-        } else {
-            log::info!("Bundled analyzer not found, using development mode");
+        // In dev, prefer Python script so changes take effect immediately.
+        if cfg!(debug_assertions) {
+            log::info!("Dev mode: using Python analyzer_core.py");
             let python_exe = find_python_executable()?;
             let script_path = find_python_script_dev()?;
             log::info!("Using Python: {}", python_exe);
             log::info!("Using script: {}", script_path.display());
-            run_with_timeout(
+            return run_with_timeout(
                 {
                     let mut cmd = Command::new(&python_exe);
                     cmd.arg(script_path)
@@ -180,27 +246,81 @@ async fn analyze(
                         .arg(&excluded_cloned)
                         .arg(&theme_cloned)
                         .arg("json");
+                    cmd.arg("--progress-file").arg(&progress_arg);
                     cmd
                 },
                 240,
-            )
+            );
         }
+
+        if let Ok(exe_path) = find_bundled_analyzer(&app_handle) {
+            log::info!("Running bundled analyzer: {}", exe_path.display());
+            return run_with_timeout(
+                {
+                    let mut cmd = Command::new(&exe_path);
+                    cmd.arg(&project_path_cloned)
+                        .arg(&extensions_cloned)
+                        .arg(&excluded_cloned)
+                        .arg(&theme_cloned)
+                        .arg("json");
+                    cmd.arg("--progress-file").arg(&progress_arg);
+                    cmd
+                },
+                240,
+            );
+        }
+
+        log::info!("Bundled analyzer not found, using Python fallback");
+        let python_exe = find_python_executable()?;
+        let script_path = find_python_script_dev()?;
+        log::info!("Using Python: {}", python_exe);
+        log::info!("Using script: {}", script_path.display());
+        run_with_timeout(
+            {
+                let mut cmd = Command::new(&python_exe);
+                cmd.arg(script_path)
+                    .arg(&project_path_cloned)
+                    .arg(&extensions_cloned)
+                    .arg(&excluded_cloned)
+                    .arg(&theme_cloned)
+                    .arg("json");
+                cmd.arg("--progress-file").arg(&progress_arg);
+                cmd
+            },
+            240,
+        )
     })
     .await
     .map_err(|e| format!("Analyzer task join error: {}", e))??;
 
+    cleanup_progress_file(&state, &progress_path);
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
         return Err(format!("Analysis failed: {}", error_msg));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let result: AnalysisResult = serde_json::from_str(&stdout)
+
+    // First try to parse as AnalyzerOutput (may contain resultFile path)
+    let analyzer_output: serde_json::Value = serde_json::from_str(&stdout)
         .map_err(|e| {
             log::error!("Failed to parse JSON: {}", e);
             log::error!("Raw output: {}", stdout);
             format!("Failed to parse analysis result: {}", e)
         })?;
+
+    // Check if result is in a file
+    let result: AnalysisResult = if let Some(result_file) = analyzer_output.get("resultFile").and_then(|v| v.as_str()) {
+        log::info!("Reading result from file: {}", result_file);
+        let file_content = std::fs::read_to_string(result_file)
+            .map_err(|e| format!("Failed to read result file: {}", e))?;
+        serde_json::from_str(&file_content)
+            .map_err(|e| format!("Failed to parse result file: {}", e))?
+    } else {
+        // Direct result in stdout (backwards compat)
+        serde_json::from_value(analyzer_output)
+            .map_err(|e| format!("Failed to parse direct result: {}", e))?
+    };
 
     Ok(result)
 }
@@ -242,12 +362,39 @@ async fn open_in_editor(file_path: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to open file: {}", e))
 }
 
+#[tauri::command]
+async fn open_folder(path: String) -> Result<(), String> {
+    log::info!("Opening folder: {}", path);
+
+    #[cfg(target_os = "windows")]
+    let result = Command::new("explorer")
+        .arg(&path)
+        .spawn();
+
+    #[cfg(target_os = "macos")]
+    let result = Command::new("open")
+        .arg(&path)
+        .spawn();
+
+    #[cfg(target_os = "linux")]
+    let result = Command::new("xdg-open")
+        .arg(&path)
+        .spawn();
+
+    result
+        .map(|_| ())
+        .map_err(|e| format!("Failed to open folder: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .manage(ProgressFileState::new())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_shell::init())
-    .invoke_handler(tauri::generate_handler![analyze, open_in_editor])
+    .plugin(tauri_plugin_fs::init())
+    .plugin(tauri_plugin_sql::Builder::default().build())
+    .invoke_handler(tauri::generate_handler![analyze, get_analysis_progress, open_in_editor, open_folder])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

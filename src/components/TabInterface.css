@@ -1,55 +1,41 @@
 .tab-container {
   display: flex;
   position: relative;
-  background: var(--aeth-border, #333);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
   padding: 4px;
-  margin-bottom: 2rem;
-  width: fit-content;
-  min-width: 300px;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .tab-button {
-  flex: 1;
-  background: none;
+  background: transparent;
   border: none;
-  color: #fff;
-  padding: 0.75rem 1.5rem;
-  font-family: inherit;
+  color: #a1a1aa;
+  padding: 0.5rem 1.25rem;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-size: 0.85rem;
   font-weight: 600;
-  font-size: 0.9rem;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  z-index: 1;
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  border-radius: 8px;
+  position: relative;
+  z-index: 2;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .tab-button.active {
-  opacity: 1;
+  color: #fff;
+  background: rgba(0, 191, 255, 0.15);
+  box-shadow: 0 0 15px rgba(0, 191, 255, 0.1);
 }
 
-.tab-icon {
-  font-size: 1.1rem;
+.tab-button:hover:not(.active) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .tab-indicator {
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  width: calc(50% - 4px);
-  background: #2a2a2a;
-  border-bottom: 2px solid var(--aeth-primary, #646cff);
-  border-radius: 6px;
-  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-/* Optional: Use the Gold Line gradient if primary is set to gold */
-.tab-indicator {
-  border-bottom: 2px solid transparent;
-  border-image: linear-gradient(to right, #ffd700, #ffa500) 1;
+  display: none; /* Removed the line indicator for a cleaner button-fill look */
 }

@@ -1,4 +1,5 @@
 """BOM-STRICT"""
+
 """
 analyzer_core.py
 ================
@@ -16,12 +17,20 @@ import graphviz
 import tempfile
 from pathlib import Path
 from datetime import datetime, timezone
-import base64
 import platform
 import time
-import logging # Added import
-import ai_packager
-import ghost_protocol
+import logging  # Added import
+
+try:
+    import ai_packager
+except Exception:
+    ai_packager = None
+
+try:
+    import ghost_protocol
+except Exception:
+    ghost_protocol = None
+
 
 def load_codegnosis_config(project_path):
     """
@@ -34,38 +43,74 @@ def load_codegnosis_config(project_path):
         "compliance_checks": {
             "required_header_text": "",
             "mandatory_files": [],
-            "forbidden_licenses": ["AGPL", "GPL", "LGPL"]
+            "forbidden_licenses": ["AGPL", "GPL", "LGPL"],
         },
-        "custom_regex_parsers": {}
+        "custom_regex_parsers": {},
+        "exclusions": {
+            "directories": [
+                ".git",
+                "node_modules",
+                "__pycache__",
+                "dist",
+                "build",
+                "target",
+            ],
+            "files": ["package-lock.json", ".DS_Store"],
+            "extensions": [".exe", ".dll", ".pyc", ".png", ".jpg", ".zip"],
+        },
+        "analysisSettings": {
+            "fileSizeLimitMB": 5,
+            "checkCircularDependencies": True,
+            "checkOrphans": True,
+            "checkMissingAssets": True,
+            "scanDepth": 10,
+        },
+        "tauri": {"enabled": False, "v2Checks": True},
+        "visualization": {"maxNodes": 400, "maxEdges": 900, "categoryColors": {}},
     }
 
     if not config_path.exists():
         return default_config
 
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             user_config = json.load(f)
-        # Merge user config with defaults
-        return {
+        # Merge user config with defaults (user overrides defaults)
+        merged = {
             "language_extensions": user_config.get("language_extensions", {}),
             "compliance_checks": {
                 **default_config["compliance_checks"],
-                **user_config.get("compliance_checks", {})
+                **user_config.get("compliance_checks", {}),
             },
-            "custom_regex_parsers": user_config.get("custom_regex_parsers", {})
+            "custom_regex_parsers": user_config.get("custom_regex_parsers", {}),
+            "exclusions": {
+                **default_config["exclusions"],
+                **user_config.get("exclusions", {}),
+            },
+            "analysisSettings": {
+                **default_config["analysisSettings"],
+                **user_config.get("analysisSettings", {}),
+            },
+            "tauri": {**default_config["tauri"], **user_config.get("tauri", {})},
+            "visualization": {
+                **default_config["visualization"],
+                **user_config.get("visualization", {}),
+            },
         }
+        return merged
     except Exception as e:
         logging.warning(f"Could not load codegnosis.config.json: {e}")
         return default_config
+
 
 # Configure logging to a file
 LOG_FILE = Path(tempfile.gettempdir()) / "codegnosis_analyzer.log"
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
-logger = logging.getLogger(__name__) # Global logger instance
+logger = logging.getLogger(__name__)  # Global logger instance
 
 # Theme definitions (Kept for Graphviz coloring logic)
 LIGHT_THEME = {
@@ -100,6 +145,7 @@ SATURATED_THEME = {
     "rainbow": True,
 }
 THEMES = [LIGHT_THEME, DARK_THEME, SATURATED_THEME]
+# Legacy caps - now loaded from config, these are fallbacks only
 GRAPH_NODE_CAP = 400
 GRAPH_EDGE_CAP = 900
 
@@ -218,7 +264,13 @@ class AnalyzerCore:
     }
 
     def __init__(
-        self, directory, extensions_to_find, custom_categories={}, excluded_folders=[], config=None
+        self,
+        directory,
+        extensions_to_find,
+        custom_categories={},
+        excluded_folders=[],
+        config=None,
+        progress_file_path=None,
     ):
         self.project_dir = Path(directory)
         self.extensions_to_find = (
@@ -230,10 +282,65 @@ class AnalyzerCore:
         self.excluded_folders = set(excluded_folders)
         self.custom_categories = custom_categories
         self.config = config or {}
+        self.progress_file = Path(progress_file_path) if progress_file_path else None
+
+        # ---------------------------------------------------------
+        # EXCLUSIONS (from config)
+        # ---------------------------------------------------------
+        excl_conf = self.config.get("exclusions", {})
+        self.excluded_dirs = set(
+            excl_conf.get(
+                "directories", [".git", "node_modules", "__pycache__", "dist", "build"]
+            )
+        )
+        self.excluded_files = set(
+            excl_conf.get("files", ["package-lock.json", ".DS_Store"])
+        )
+        # Normalize extensions to lowercase
+        self.excluded_extensions = {
+            ext.lower()
+            for ext in excl_conf.get(
+                "extensions", [".exe", ".dll", ".pyc", ".png", ".jpg", ".zip"]
+            )
+        }
+
+        # ---------------------------------------------------------
+        # ANALYSIS SETTINGS (from config)
+        # ---------------------------------------------------------
+        analysis_conf = self.config.get("analysisSettings", {})
+        self.max_file_size_mb = analysis_conf.get("fileSizeLimitMB", 5)
+        self.max_file_size_bytes = self.max_file_size_mb * 1024 * 1024
+        self.check_circular = analysis_conf.get("checkCircularDependencies", True)
+        self.check_orphans = analysis_conf.get("checkOrphans", True)
+        self.check_missing_assets = analysis_conf.get("checkMissingAssets", True)
+        self.scan_depth = analysis_conf.get("scanDepth", 10)
+
+        # ---------------------------------------------------------
+        # TAURI SETTINGS (from config)
+        # ---------------------------------------------------------
+        tauri_conf = self.config.get("tauri", {})
+        self.tauri_enabled = tauri_conf.get("enabled", False)
+        self.tauri_v2_checks = tauri_conf.get("v2Checks", True)
+
+        # ---------------------------------------------------------
+        # VISUALIZATION (from config)
+        # ---------------------------------------------------------
+        viz_conf = self.config.get("visualization", {})
+        self.max_graph_nodes = viz_conf.get("maxNodes", 400)
+        self.max_graph_edges = viz_conf.get("maxEdges", 900)
+        # Merge config colors with defaults
+        self.dynamic_category_colors = {
+            **self.CATEGORY_COLORS,
+            **viz_conf.get("categoryColors", {}),
+        }
 
         # Merge categories: MASTER_CATEGORIES < config language_extensions < custom_categories
         config_extensions = self.config.get("language_extensions", {})
-        self.all_categories = {**self.MASTER_CATEGORIES, **config_extensions, **custom_categories}
+        self.all_categories = {
+            **self.MASTER_CATEGORIES,
+            **config_extensions,
+            **self.custom_categories,
+        }
 
         self.file_graph = {}
         self.file_types = {}
@@ -246,13 +353,32 @@ class AnalyzerCore:
         self.orphaned_files = set()
         self.asset_references = {}
         self.start_time = time.time()
-        self.logger = logger # Use the global logger instance
+        self.logger = logger  # Use the global logger instance
+
+    def emit_progress(self, stage, percent, message):
+        if not self.progress_file:
+            return
+        payload = {
+            "stage": stage,
+            "percent": percent,
+            "message": message,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            self.progress_file.write_text(json.dumps(payload))
+        except Exception as exc:
+            self.logger.debug(f"Failed to write progress file: {exc}")
 
     # --- Core Logic Methods (Retained) ---
 
     def analyze(self):
         """Main analysis entry point."""
         files = self._find_files()
+        self.emit_progress(
+            "scanning",
+            15,
+            f"Scan complete: {len(files)} files after excludes",
+        )
         self.logger.info(f"Scan complete: {len(files)} files after excludes")
 
         # PASS 1: Collect all files first (so we know what exists)
@@ -262,20 +388,41 @@ class AnalyzerCore:
             self.file_types[rel_path] = category
             self.file_graph[rel_path] = []
 
+        self.emit_progress("registering", 30, "File registration complete")
         self.logger.info(f"Pass 1 complete: {len(self.file_types)} files registered")
 
         # PASS 2: Now resolve dependencies (all files are known)
         for file_path in files:
             rel_path = self._get_relpath(file_path)
             deps = self._detect_dependencies(file_path)
-            self.logger.info(f"File {rel_path}: detected {len(deps)} raw imports: {deps[:5]}...")
             for dep in deps:
                 resolved = self._resolve_path(file_path, dep)
-                self.logger.info(f"  Import '{dep}' -> resolved: {resolved}")
-                if resolved and resolved in self.file_types:
-                    self.file_graph[rel_path].append(resolved)
-                    self.logger.info(f"    ADDED connection: {rel_path} -> {resolved}")
+                if resolved:
+                    # Logic: Add local files OR external virtual nodes
+                    if resolved in self.file_types or resolved.startswith("ext:"):
+                        if resolved not in self.file_types:
+                            # Register the external node with safe defaults
+                            self.file_types[resolved] = "External"
+                            self.file_graph[resolved] = []
+                            # Add safe metadata for the frontend
+                            if not hasattr(self, 'file_data'): self.file_data = {}
+                            self.file_data[resolved] = {
+                                "category": "External",
+                                "size": "0KB",
+                                "mtime": 0,
+                                "ctime": 0,
+                                "inboundCount": 0,
+                                "outboundCount": 0,
+                                "chainDepth": 1,
+                                "isUnused": False,
+                                "cycleParticipation": 0
+                            }
+                        
+                        self.file_graph[rel_path].append(resolved)
 
+        self.emit_progress(
+            "dependencies", 55, "Dependency graph built and connections resolved"
+        )
         self.logger.info("Dependency graph built; analyzing connectivity")
         self._analyze_connectivity(files)
 
@@ -286,60 +433,12 @@ class AnalyzerCore:
     def _find_files(self):
         """Find all relevant files in the project."""
         found = []
-        default_excludes = {
-            ".git",
-            "node_modules",
-            "dist",
-            "build",
-            "target",
-            "src-tauri/target",
-            ".vite",
-            ".svelte-kit",
-            ".next",
-            ".cache",
-            ".parcel-cache",
-            ".angular",
-            ".turbo",
-            ".yarn",
-            ".pnpm-store",
-            ".venv",
-            "venv",
-            "env",
-            "tmp",
-            "temp",
-            "logs",
-            "deps",
-            ".output",
-            "coverage",
-            "bin",
-            "obj",
-            ".scannerwork",
-            ".gradle",
-            ".idea",
-            ".vscode",
-            "__pycache__",
-        }
-        all_excludes = set(self.excluded_folders) | default_excludes
-        skip_large_exts = {
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".gif",
-            ".webp",
-            ".svg",
-            ".ico",
-            ".mp4",
-            ".mp3",
-            ".pdf",
-            ".zip",
-            ".tar",
-            ".gz",
-            ".7z",
-            ".ttf",
-            ".woff",
-            ".woff2",
-        }
-        max_size_bytes = 5 * 1024 * 1024  # 5MB cap for scan
+        # Use config-driven exclusions merged with any passed excluded_folders
+        all_excludes = self.excluded_dirs | set(self.excluded_folders)
+        # Use config-driven extension exclusions for large file skipping
+        skip_large_exts = self.excluded_extensions
+        # Use config-driven file size limit
+        max_size_bytes = self.max_file_size_bytes
         log_every = 500
         seen = 0
         for root, dirs, files in os.walk(self.project_dir):
@@ -356,14 +455,19 @@ class AnalyzerCore:
                 ):
                     fp = Path(root) / filename
                     try:
-                        if ext in skip_large_exts and fp.stat().st_size > max_size_bytes:
+                        if (
+                            ext in skip_large_exts
+                            and fp.stat().st_size > max_size_bytes
+                        ):
                             continue
                     except Exception:
                         pass
                     found.append(fp)
                     seen += 1
                     if seen % log_every == 0:
-                        self.logger.info(f"Scanning... {seen} files queued (dir={root})")
+                        self.logger.info(
+                            f"Scanning... {seen} files queued (dir={root})"
+                        )
 
         return found
 
@@ -373,6 +477,9 @@ class AnalyzerCore:
 
     def _categorize(self, file_path):
         """Categorize a file by extension."""
+        if str(file_path).startswith("ext:"):
+            return "External"
+            
         filename = Path(file_path).name
         ext = Path(file_path).suffix.lower()
 
@@ -396,15 +503,34 @@ class AnalyzerCore:
 
         # Map extensions to config parser keys
         ext_to_parser_key = {
-            ".java": "java", ".jav": "java", ".j": "java",
-            ".cs": "csharp", ".cshtml": "csharp", ".csx": "csharp",
+            ".java": "java",
+            ".jav": "java",
+            ".j": "java",
+            ".cs": "csharp",
+            ".cshtml": "csharp",
+            ".csx": "csharp",
             ".c": "c",
-            ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".c++": "cpp", ".cp": "cpp",
-            ".h": "cpp", ".hpp": "cpp", ".hxx": "cpp", ".hh": "cpp", ".h++": "cpp",
-            ".inl": "cpp", ".tpp": "cpp", ".tcc": "cpp", ".inc": "cpp",
+            ".cpp": "cpp",
+            ".cc": "cpp",
+            ".cxx": "cpp",
+            ".c++": "cpp",
+            ".cp": "cpp",
+            ".h": "cpp",
+            ".hpp": "cpp",
+            ".hxx": "cpp",
+            ".hh": "cpp",
+            ".h++": "cpp",
+            ".inl": "cpp",
+            ".tpp": "cpp",
+            ".tcc": "cpp",
+            ".inc": "cpp",
             ".go": "go",
             ".rs": "rust",
-            ".php": "php", ".phtml": "php", ".php3": "php", ".php4": "php", ".php5": "php",
+            ".php": "php",
+            ".phtml": "php",
+            ".php3": "php",
+            ".php4": "php",
+            ".php5": "php",
         }
 
         # Check if we have custom regex parsers for this extension
@@ -413,7 +539,9 @@ class AnalyzerCore:
 
         if parser_key and parser_key in custom_parsers:
             # Use config-driven parsing
-            imports = self._apply_custom_parsers(content, custom_parsers[parser_key], parser_key)
+            imports = self._apply_custom_parsers(
+                content, custom_parsers[parser_key], parser_key
+            )
             if imports:
                 return imports
             # Fall through to hardcoded if config parsing returned nothing
@@ -427,7 +555,19 @@ class AnalyzerCore:
             return self._detect_java_imports(content)
         elif ext == ".cs":
             return self._detect_csharp_imports(content)
-        elif ext in [".c", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".hxx", ".hh", ".inl", ".tpp", ".tcc"]:
+        elif ext in [
+            ".c",
+            ".cpp",
+            ".cc",
+            ".cxx",
+            ".h",
+            ".hpp",
+            ".hxx",
+            ".hh",
+            ".inl",
+            ".tpp",
+            ".tcc",
+        ]:
             return self._detect_cpp_includes(content)
         elif ext == ".go":
             return self._detect_go_imports(content)
@@ -479,7 +619,9 @@ class AnalyzerCore:
                         continue
 
                     # Convert raw import to file path based on language
-                    resolved = self._convert_import_to_path(raw_import.strip(), lang_key, pattern_name)
+                    resolved = self._convert_import_to_path(
+                        raw_import.strip(), lang_key, pattern_name
+                    )
                     if resolved:
                         if isinstance(resolved, list):
                             imports.extend(resolved)
@@ -565,7 +707,9 @@ class AnalyzerCore:
         """
         imports = []
         # Standard and wildcard imports: import com.example.ClassName;
-        standard_imports = re.findall(r'^\s*import\s+([\w\.\*]+);', content, re.MULTILINE)
+        standard_imports = re.findall(
+            r"^\s*import\s+([\w\.\*]+);", content, re.MULTILINE
+        )
         for imp in standard_imports:
             # Convert package.Class to package/Class.java (strip wildcard for resolution)
             path = imp.replace(".", "/")
@@ -576,7 +720,9 @@ class AnalyzerCore:
                 imports.append(path + ".java")
 
         # Static imports: import static com.example.ClassName.methodName;
-        static_imports = re.findall(r'^\s*import\s+static\s+([\w\.\*]+);', content, re.MULTILINE)
+        static_imports = re.findall(
+            r"^\s*import\s+static\s+([\w\.\*]+);", content, re.MULTILINE
+        )
         for imp in static_imports:
             # Static imports reference a class, extract class path (everything before last dot)
             parts = imp.rsplit(".", 1)
@@ -596,9 +742,7 @@ class AnalyzerCore:
         # Standard namespace imports: using System.Collections.Generic;
         # Also handles: global using, using static
         namespace_imports = re.findall(
-            r'^\s*(?:global\s+)?using\s+(?:static\s+)?([\w\.]+);',
-            content,
-            re.MULTILINE
+            r"^\s*(?:global\s+)?using\s+(?:static\s+)?([\w\.]+);", content, re.MULTILINE
         )
         for ns in namespace_imports:
             # Convert Namespace.Class to Namespace/Class.cs
@@ -607,9 +751,7 @@ class AnalyzerCore:
 
         # Alias directives: using Alias = Namespace.Class;
         alias_imports = re.findall(
-            r'^\s*(?:global\s+)?using\s+\w+\s*=\s*([\w\.]+);',
-            content,
-            re.MULTILINE
+            r"^\s*(?:global\s+)?using\s+\w+\s*=\s*([\w\.]+);", content, re.MULTILINE
         )
         for ns in alias_imports:
             path = ns.replace(".", "/") + ".cs"
@@ -627,9 +769,7 @@ class AnalyzerCore:
         # Angled brackets: #include <iostream> - system/library headers
         # These typically won't resolve to local files but we track them for completeness
         angled_includes = re.findall(
-            r'^\s*#\s*include\s*<([^>]+)>',
-            content,
-            re.MULTILINE
+            r"^\s*#\s*include\s*<([^>]+)>", content, re.MULTILINE
         )
         for inc in angled_includes:
             # System headers - keep as-is, may or may not resolve locally
@@ -638,9 +778,7 @@ class AnalyzerCore:
         # Quoted includes: #include "myheader.h" - local/project headers
         # These are more likely to resolve to actual project files
         quoted_includes = re.findall(
-            r'^\s*#\s*include\s*"([^"]+)"',
-            content,
-            re.MULTILINE
+            r'^\s*#\s*include\s*"([^"]+)"', content, re.MULTILINE
         )
         for inc in quoted_includes:
             # Local headers - keep path as specified
@@ -657,25 +795,17 @@ class AnalyzerCore:
 
         # Single-line imports: import "fmt" or import alias "path/to/pkg"
         single_imports = re.findall(
-            r'^\s*import\s+(?:\w+\s+)?"([^"]+)"',
-            content,
-            re.MULTILINE
+            r'^\s*import\s+(?:\w+\s+)?"([^"]+)"', content, re.MULTILINE
         )
         imports.extend(single_imports)
 
         # Block imports: import ( "fmt" \n "os" )
         # First, find all import blocks
-        block_matches = re.findall(
-            r'import\s*\(\s*([\s\S]*?)\s*\)',
-            content
-        )
+        block_matches = re.findall(r"import\s*\(\s*([\s\S]*?)\s*\)", content)
         for block in block_matches:
             # Extract individual imports from within the block
             # Handles: "fmt", alias "path/pkg", . "pkg", _ "pkg"
-            block_imports = re.findall(
-                r'(?:[\w._]\s+)?"([^"]+)"',
-                block
-            )
+            block_imports = re.findall(r'(?:[\w._]\s+)?"([^"]+)"', block)
             imports.extend(block_imports)
 
         # Convert import paths to potential file paths
@@ -692,9 +822,7 @@ class AnalyzerCore:
 
         # Simple use statements: use std::collections::HashMap;
         simple_uses = re.findall(
-            r'^\s*use\s+([\w:]+)(?:\s+as\s+\w+)?;',
-            content,
-            re.MULTILINE
+            r"^\s*use\s+([\w:]+)(?:\s+as\s+\w+)?;", content, re.MULTILINE
         )
         for use_path in simple_uses:
             # Convert std::collections::HashMap to std/collections/HashMap.rs
@@ -704,16 +832,14 @@ class AnalyzerCore:
 
         # Grouped use statements: use std::{io, fs, collections::HashMap};
         grouped_uses = re.findall(
-            r'^\s*use\s+([\w:]+)::\{([^\}]+)\};',
-            content,
-            re.MULTILINE
+            r"^\s*use\s+([\w:]+)::\{([^\}]+)\};", content, re.MULTILINE
         )
         for base_path, group in grouped_uses:
             # Split the group by comma and process each item
-            items = [item.strip() for item in group.split(',')]
+            items = [item.strip() for item in group.split(",")]
             for item in items:
                 # Handle nested paths like collections::HashMap
-                item = item.split(' as ')[0].strip()  # Remove 'as alias' if present
+                item = item.split(" as ")[0].strip()  # Remove 'as alias' if present
                 if item:
                     full_path = base_path + "::" + item
                     file_path = full_path.replace("::", "/") + ".rs"
@@ -721,9 +847,7 @@ class AnalyzerCore:
 
         # Also detect mod declarations which indicate submodule files
         mod_declarations = re.findall(
-            r'^\s*(?:pub\s+)?mod\s+(\w+);',
-            content,
-            re.MULTILINE
+            r"^\s*(?:pub\s+)?mod\s+(\w+);", content, re.MULTILINE
         )
         for mod_name in mod_declarations:
             # mod foo; means either foo.rs or foo/mod.rs exists
@@ -743,9 +867,7 @@ class AnalyzerCore:
         # Modern namespace use statements: use App\Utils\Logger;
         # Also handles: use App\Utils\Logger as Log;
         namespace_uses = re.findall(
-            r'^\s*use\s+([\w\\]+)(?:\s+as\s+\w+)?;',
-            content,
-            re.MULTILINE
+            r"^\s*use\s+([\w\\]+)(?:\s+as\s+\w+)?;", content, re.MULTILINE
         )
         for ns in namespace_uses:
             # Convert namespace to PSR-4 style path: App\Utils\Logger -> App/Utils/Logger.php
@@ -754,15 +876,13 @@ class AnalyzerCore:
 
         # Grouped use statements: use App\Models\{User, Post, Comment};
         grouped_uses = re.findall(
-            r'^\s*use\s+([\w\\]+)\\\{([^\}]+)\};',
-            content,
-            re.MULTILINE
+            r"^\s*use\s+([\w\\]+)\\\{([^\}]+)\};", content, re.MULTILINE
         )
         for base_ns, group in grouped_uses:
-            items = [item.strip() for item in group.split(',')]
+            items = [item.strip() for item in group.split(",")]
             for item in items:
                 # Remove 'as Alias' if present
-                item = item.split(' as ')[0].strip()
+                item = item.split(" as ")[0].strip()
                 if item:
                     full_ns = base_ns + "\\" + item
                     path = full_ns.replace("\\", "/") + ".php"
@@ -780,7 +900,7 @@ class AnalyzerCore:
             matches = re.findall(pattern, content, re.MULTILINE)
             for match in matches:
                 # Filter out dynamic paths (containing variables like $var)
-                if not match.startswith('$') and '$' not in match:
+                if not match.startswith("$") and "$" not in match:
                     imports.append(match)
 
         return imports
@@ -831,9 +951,13 @@ class AnalyzerCore:
         if not ref_str:
             return None
 
-        # Skip external packages (no ./ or ../ prefix and no extension)
-        if not ref_str.startswith('.') and '/' not in ref_str and not Path(ref_str).suffix:
-            return None  # External package like 'react', 'three', etc.
+        # Capture external packages (no ./ or ../ prefix and no extension)
+        if (
+            not ref_str.startswith(".")
+            and "/" not in ref_str
+            and not Path(ref_str).suffix
+        ):
+            return f"ext:{ref_str}"  # Virtual external node
 
         current_dir = Path(from_file).parent
         candidates = []
@@ -978,6 +1102,14 @@ class AnalyzerCore:
 
         return None
 
+    def _get_node_color(self, category):
+        """Retrieve color from config, falling back to defaults."""
+        if category in self.dynamic_category_colors:
+            return self.dynamic_category_colors[category]
+        if "Default" in self.dynamic_category_colors:
+            return self.dynamic_category_colors["Default"]
+        return "lightgray"
+
     def build_graph(self, is_dark_theme=False, graph_format="png", output_dir="."):
         """Builds and renders the Graphviz diagram."""
         output_dir_path = Path(output_dir)
@@ -1001,13 +1133,17 @@ class AnalyzerCore:
 
         for file, file_type in self.file_types.items():
             label = Path(file).name
-            color = self.CATEGORY_COLORS.get(file_type, self.CATEGORY_COLORS["Default"])
-            dot.node(file, label, fillcolor=color, fontcolor="black")
+            color = self._get_node_color(file_type)
+            # Sanitize ID for Graphviz (replace colons with underscores)
+            safe_id = file.replace(":", "_")
+            dot.node(f'"{safe_id}"', label, fillcolor=color, fontcolor="black")
 
         for file, deps in self.file_graph.items():
+            safe_source = file.replace(":", "_")
             for dep in deps:
                 if dep in self.file_types:
-                    dot.edge(file, dep)
+                    safe_target = dep.replace(":", "_")
+                    dot.edge(f'"{safe_source}"', f'"{safe_target}"')
 
         output_path = output_dir_path / "project_architecture"
         dot.render(str(output_path), format=graph_format, cleanup=True)
@@ -1073,6 +1209,30 @@ class AnalyzerCore:
 
         return max_depth
 
+    def _calculate_chain_depths(self, graph):
+        """Calculate per-node dependency chain depth (longest path from node)."""
+        memo = {}
+        visiting = set()
+
+        def dfs(node):
+            if node in memo:
+                return memo[node]
+            if node in visiting:
+                return 0
+            visiting.add(node)
+            deps = graph.get(node, [])
+            if not deps:
+                depth = 1
+            else:
+                depth = 1 + max((dfs(dep) for dep in deps), default=0)
+            visiting.remove(node)
+            memo[node] = depth
+            return depth
+
+        for node in graph:
+            dfs(node)
+        return memo
+
     def _calculate_connectivity_score(self, analyzer):
         """Calculate connectivity health score (0-100)."""
         total_files = len(analyzer.file_types)
@@ -1114,7 +1274,7 @@ class AnalyzerCore:
             tauri_conf_path = self.project_dir / "src-tauri" / "tauri.conf.json"
             if tauri_conf_path.exists():
                 try:
-                    with open(tauri_conf_path, 'r', encoding='utf-8') as f:
+                    with open(tauri_conf_path, "r", encoding="utf-8") as f:
                         tauri_conf = json.load(f)
                     schema = tauri_conf.get("$schema", "")
                     if "schema.tauri.app/config/2" in schema:
@@ -1158,21 +1318,27 @@ class AnalyzerCore:
         """
         warnings = []
 
+        # Skip if Tauri checks are disabled in config
+        if not self.tauri_enabled:
+            return warnings
+
         # Check if this is a Tauri 2 project
         tauri_conf_path = self.project_dir / "src-tauri" / "tauri.conf.json"
         if not tauri_conf_path.exists():
             return warnings  # Not a Tauri project
 
         try:
-            with open(tauri_conf_path, 'r', encoding='utf-8') as f:
+            with open(tauri_conf_path, "r", encoding="utf-8") as f:
                 tauri_conf = json.load(f)
         except Exception as e:
-            warnings.append({
-                "type": "tauri_config_error",
-                "file": "src-tauri/tauri.conf.json",
-                "reason": f"Failed to parse tauri.conf.json: {e}",
-                "severity": "high"
-            })
+            warnings.append(
+                {
+                    "type": "tauri_config_error",
+                    "file": "src-tauri/tauri.conf.json",
+                    "reason": f"Failed to parse tauri.conf.json: {e}",
+                    "severity": "high",
+                }
+            )
             return warnings
 
         # Check if Tauri 2 (has schema v2)
@@ -1196,18 +1362,21 @@ class AnalyzerCore:
             if category == "HTML" and "public/" in file_path:
                 full_path = self.project_dir / file_path
                 try:
-                    with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                         content = f.read()
 
                     # Check for Tauri IPC usage patterns
-                    uses_tauri = any(pattern in content for pattern in [
-                        "window.__TAURI__",
-                        "__TAURI__",
-                        "@tauri-apps/api",
-                        "invoke(",
-                        ".listen(",
-                        ".emit("
-                    ])
+                    uses_tauri = any(
+                        pattern in content
+                        for pattern in [
+                            "window.__TAURI__",
+                            "__TAURI__",
+                            "@tauri-apps/api",
+                            "invoke(",
+                            ".listen(",
+                            ".emit(",
+                        ]
+                    )
 
                     if uses_tauri:
                         static_html_with_tauri.append(file_path)
@@ -1216,29 +1385,33 @@ class AnalyzerCore:
 
         # Warn if static HTML uses Tauri but withGlobalTauri not set
         if static_html_with_tauri and not has_global_tauri:
-            warnings.append({
-                "type": "tauri_missing_global_tauri",
-                "files": static_html_with_tauri,
-                "reason": "Static HTML files use window.__TAURI__ but 'withGlobalTauri: true' not set in app config. IPC calls will fail.",
-                "fix": "Add '\"withGlobalTauri\": true' to app section of tauri.conf.json",
-                "severity": "high"
-            })
+            warnings.append(
+                {
+                    "type": "tauri_missing_global_tauri",
+                    "files": static_html_with_tauri,
+                    "reason": "Static HTML files use window.__TAURI__ but 'withGlobalTauri: true' not set in app config. IPC calls will fail.",
+                    "fix": "Add '\"withGlobalTauri\": true' to app section of tauri.conf.json",
+                    "severity": "high",
+                }
+            )
 
         # Check capabilities
         capabilities_dir = self.project_dir / "src-tauri" / "capabilities"
         if not capabilities_dir.exists():
-            warnings.append({
-                "type": "tauri_no_capabilities",
-                "reason": "Tauri 2 project missing capabilities directory. Windows may lack required permissions.",
-                "fix": "Create src-tauri/capabilities/default.json with required permissions",
-                "severity": "medium"
-            })
+            warnings.append(
+                {
+                    "type": "tauri_no_capabilities",
+                    "reason": "Tauri 2 project missing capabilities directory. Windows may lack required permissions.",
+                    "fix": "Create src-tauri/capabilities/default.json with required permissions",
+                    "severity": "medium",
+                }
+            )
         else:
             # Parse capabilities and check coverage
             capabilities = {}
             for cap_file in capabilities_dir.glob("*.json"):
                 try:
-                    with open(cap_file, 'r', encoding='utf-8') as f:
+                    with open(cap_file, "r", encoding="utf-8") as f:
                         cap_data = json.load(f)
                     cap_name = cap_data.get("identifier", cap_file.stem)
                     capabilities[cap_name] = cap_data
@@ -1255,32 +1428,44 @@ class AnalyzerCore:
 
             uncovered = set(window_labels) - covered_windows
             if uncovered:
-                warnings.append({
-                    "type": "tauri_uncovered_windows",
-                    "windows": list(uncovered),
-                    "reason": f"Windows {list(uncovered)} not listed in any capability file. They may lack IPC access.",
-                    "severity": "medium"
-                })
+                warnings.append(
+                    {
+                        "type": "tauri_uncovered_windows",
+                        "windows": list(uncovered),
+                        "reason": f"Windows {list(uncovered)} not listed in any capability file. They may lack IPC access.",
+                        "severity": "medium",
+                    }
+                )
 
             # Scan frontend for IPC usage and check permissions
             ipc_usage = self._scan_tauri_ipc_usage()
 
             # Check for missing event permissions
-            if ipc_usage.get("uses_listen") and "core:event:allow-listen" not in all_permissions:
-                warnings.append({
-                    "type": "tauri_missing_permission",
-                    "permission": "core:event:allow-listen",
-                    "reason": "Frontend uses event.listen() but permission not granted in capabilities",
-                    "severity": "high"
-                })
+            if (
+                ipc_usage.get("uses_listen")
+                and "core:event:allow-listen" not in all_permissions
+            ):
+                warnings.append(
+                    {
+                        "type": "tauri_missing_permission",
+                        "permission": "core:event:allow-listen",
+                        "reason": "Frontend uses event.listen() but permission not granted in capabilities",
+                        "severity": "high",
+                    }
+                )
 
-            if ipc_usage.get("uses_emit") and "core:event:allow-emit" not in all_permissions:
-                warnings.append({
-                    "type": "tauri_missing_permission",
-                    "permission": "core:event:allow-emit",
-                    "reason": "Frontend uses event.emit() but permission not granted in capabilities",
-                    "severity": "high"
-                })
+            if (
+                ipc_usage.get("uses_emit")
+                and "core:event:allow-emit" not in all_permissions
+            ):
+                warnings.append(
+                    {
+                        "type": "tauri_missing_permission",
+                        "permission": "core:event:allow-emit",
+                        "reason": "Frontend uses event.emit() but permission not granted in capabilities",
+                        "severity": "high",
+                    }
+                )
 
         return warnings
 
@@ -1303,7 +1488,7 @@ class AnalyzerCore:
 
             full_path = self.project_dir / file_path
             try:
-                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
 
                 # Check invoke usage
@@ -1330,6 +1515,7 @@ class AnalyzerCore:
 
     def generate_analysis_report(self):
         """Compiles all analysis data into a single JSON-ready report."""
+        self.emit_progress("report", 70, "Analysis report generated")
         total_files = len(self.file_types)
         total_connections = sum(len(deps) for deps in self.file_graph.values())
 
@@ -1358,6 +1544,21 @@ class AnalyzerCore:
         ]
 
         circular_deps = self._detect_circular_dependencies(self.file_graph)
+        chain_depths = self._calculate_chain_depths(self.file_graph)
+
+        cycle_participation = {file: 0 for file in self.file_types.keys()}
+        cycles_payload = []
+        for cycle in circular_deps:
+            for file in cycle:
+                cycle_participation[file] = cycle_participation.get(file, 0) + 1
+            cycles_payload.append(
+                {
+                    "type": "circular_dependency",
+                    "nodes": cycle,
+                    "description": " -> ".join(cycle + [cycle[0]]),
+                    "severity": "high",
+                }
+            )
 
         # Health warnings compilation
         health_warnings = []
@@ -1393,6 +1594,11 @@ class AnalyzerCore:
         detailed_files = {}
         for file, file_type in self.file_types.items():
             file_path = Path(self.project_dir) / file
+            inbound_count = import_counts.get(file, 0)
+            outbound_count = len(self.file_graph.get(file, []))
+            depth_from_root = len(file.split("/")) - 1
+            
+            # Default metadata for all files (including external)
             file_info = {
                 "category": file_type,
                 "imports": self.file_graph.get(file, []),
@@ -1402,15 +1608,35 @@ class AnalyzerCore:
                 "isEntryPoint": file in [ep["file"] for ep in entry_points],
                 "dependencyCount": len(self.file_graph.get(file, [])),
                 "isUnused": file in self.orphaned_files,
+                "inboundCount": inbound_count,
+                "outboundCount": outbound_count,
+                "depthFromRoot": depth_from_root,
+                "chainDepth": chain_depths.get(file, 1),
+                "cycleParticipation": cycle_participation.get(file, 0),
+                "mtime": 0,
+                "size": "0KB",
+                "signature": None
             }
+            
             try:
-                if file_path.exists():
-                    file_info["size"] = f"{file_path.stat().st_size / 1024:.1f}KB"
+                if not file.startswith("ext:") and file_path.exists():
+                    stat = file_path.stat()
+                    file_info["size"] = f"{stat.st_size / 1024:.1f}KB"
+                    file_info["mtime"] = stat.st_mtime
+                    file_info["ctime"] = stat.st_ctime
+                    file_info["lastModified"] = datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat()
+                    
                     if file_type not in ["Image", "Video", "Audio", "Font"]:
                         with open(
                             file_path, "r", encoding="utf-8", errors="ignore"
                         ) as f:
-                            file_info["lines"] = sum(1 for _ in f)
+                            content = f.read()
+                            file_info["lines"] = len(content.splitlines())
+                            
+                            # HUMAN TRACE: Scan for signatures
+                            sig_match = re.search(r'(?i)(?:by|author|created\s+by|todo):\s*([A-Za-z\s]{3,20})', content)
+                            if sig_match:
+                                file_info["signature"] = sig_match.group(1).strip()
             except:
                 pass
             detailed_files[file] = file_info
@@ -1432,6 +1658,18 @@ class AnalyzerCore:
             "entryPoints": entry_points,
             "hubFiles": hub_files,
             "healthWarnings": health_warnings,
+            "cycles": cycles_payload,
+            "brokenReferences": [
+                {"file": file, "missingAssets": missing}
+                for file, missing in self.missing_assets.items()
+            ],
+            "graphStats": {
+                "totalNodes": total_files,
+                "totalEdges": total_connections,
+                "maxDepth": self._calculate_max_chain_depth(self.file_graph),
+                "cycleCount": len(circular_deps),
+                "isolatedNodes": len([f for f, deps in self.file_graph.items() if not deps and import_counts.get(f, 0) == 0]),
+            },
             "statistics": {
                 "avgDependenciesPerFile": (
                     round(total_connections / total_files, 2) if total_files > 0 else 0
@@ -1455,12 +1693,20 @@ class AnalyzerCore:
 
 # --- Main Bridge Function ---
 def analyze_project_cli(
-    project_path, extensions_str, excluded_str, theme_name, format_name
+    project_path,
+    extensions_str,
+    excluded_str,
+    theme_name,
+    format_name,
+    progress_file_path=None,
 ):
     """
     Main entry point for the Electron/Node.js bridge.
     Receives JSON arguments, performs analysis, and prints result to stdout.
     """
+    orig_stdout = sys.stdout
+    # Force all non-JSON output to stderr to protect stdout for JSON only.
+    sys.stdout = sys.stderr
     try:
         extensions = (
             [e.strip() for e in extensions_str.split(",") if e.strip()]
@@ -1471,10 +1717,16 @@ def analyze_project_cli(
 
         # Load configuration from codegnosis.config.json
         config = load_codegnosis_config(project_path)
-        logger.info(f"Loaded config: {len(config.get('language_extensions', {}))} custom language extensions")
+        logger.info(
+            f"Loaded config: {len(config.get('language_extensions', {}))} custom language extensions"
+        )
 
         analyzer = AnalyzerCore(
-            project_path, extensions, excluded_folders=excluded, config=config
+            project_path,
+            extensions,
+            excluded_folders=excluded,
+            config=config,
+            progress_file_path=progress_file_path,
         )
         analyzer.logger.info("Starting analysis")
         report = analyzer.analyze()
@@ -1483,9 +1735,13 @@ def analyze_project_cli(
         report["configLoaded"] = bool(config.get("language_extensions"))
 
         # --- MULTIPLIER: Ghost Protocol (Compliance Scan) ---
-        # Ghost Protocol reads its own config internally from project_path
-        compliance_report = ghost_protocol.perform_compliance_scan(report, project_path)
-        report["complianceReport"] = compliance_report
+        if ghost_protocol:
+            # Ghost Protocol reads its own config internally from project_path
+            compliance_report = ghost_protocol.perform_compliance_scan(report, project_path)
+            analyzer.emit_progress("compliance", 85, "Compliance scan complete")
+            report["complianceReport"] = compliance_report
+        else:
+            report["complianceReport"] = {}
 
         analyzer.logger.info(
             f"Analysis finished: {report['summary']['totalFiles']} files, "
@@ -1495,8 +1751,8 @@ def analyze_project_cli(
         # Render graph for visualization (skip when above caps)
         is_dark = theme_name == "Dark"
         is_large = (
-            report["summary"]["totalFiles"] > 100
-            or report["summary"]["totalConnections"] > 200
+            report['summary']['totalFiles'] > 100
+            or report['summary']['totalConnections'] > 200
         )
         graph_format = "svg" if is_large else "png"
 
@@ -1506,9 +1762,20 @@ def analyze_project_cli(
         except Exception:
             safe_graph_dir = Path(".")
 
+        # Use config-driven caps (fallback to global constants)
+        node_cap = (
+            analyzer.max_graph_nodes
+            if hasattr(analyzer, "max_graph_nodes")
+            else GRAPH_NODE_CAP
+        )
+        edge_cap = (
+            analyzer.max_graph_edges
+            if hasattr(analyzer, "max_graph_edges")
+            else GRAPH_EDGE_CAP
+        )
         skip_graph = (
-            report["summary"]["totalFiles"] > GRAPH_NODE_CAP
-            or report["summary"]["totalConnections"] > GRAPH_EDGE_CAP
+            report["summary"]["totalFiles"] > node_cap
+            or report["summary"]["totalConnections"] > edge_cap
         )
 
         graph_path = None
@@ -1517,15 +1784,23 @@ def analyze_project_cli(
             analyzer.logger.info(
                 f"Skipping graph render (cap hit; files={report['summary']['totalFiles']}, "
                 f"connections={report['summary']['totalConnections']}, "
-                f"caps={GRAPH_NODE_CAP}/{GRAPH_EDGE_CAP})"
+                f"caps={node_cap}/{edge_cap})"
+            )
+            analyzer.emit_progress(
+                "visualization",
+                95,
+                "Graph render skipped due to size caps",
             )
         else:
             graph_path = analyzer.build_graph(
                 is_dark_theme=is_dark,
                 graph_format=graph_format,
-                output_dir=safe_graph_dir,
+                output_dir=str(safe_graph_dir),
             )
             analyzer.logger.info(f"Graph rendered to {graph_path}")
+            analyzer.emit_progress(
+                "visualization", 95, "Graph rendered for visualization"
+            )
 
         report["graphImagePath"] = graph_path
         report["graphImageFormat"] = graph_format if graph_path else None
@@ -1534,23 +1809,35 @@ def analyze_project_cli(
                 "Graph skipped due to size cap; view JSON-only for this project."
             )
 
-        # Print the final JSON report to standard output for the calling Node process to capture
-        sys.stdout.write(json.dumps(report))
+        # Write report to temp file to avoid IPC payload size limits
+        result_file = Path(tempfile.gettempdir()) / "codegnosis_result.json"
+        with open(result_file, "w", encoding="utf-8") as f:
+            json.dump(report, f)
+
+        analyzer.emit_progress("finalizing", 98, "Writing final report")
+        # Return just the file path - frontend will read the file directly
+        # Ensure we write ONLY JSON to stdout
+        orig_stdout.write(json.dumps({"resultFile": str(result_file)}))
+        orig_stdout.flush()
 
         # --- MULTIPLIER: AI Context Packaging ---
-        ai_bundle_name = f"ai_bundle_{report['projectName']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        ai_bundle_path = Path(project_path) / ai_bundle_name
-        ai_packager.package_for_ai(report, ai_bundle_path, project_path)
+        if ai_packager:
+            ai_bundle_name = f"ai_bundle_{report['projectName']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            ai_bundle_path = Path(project_path) / ai_bundle_name
+            ai_packager.package_for_ai(report, ai_bundle_path, project_path)
+
+        analyzer.emit_progress("done", 100, "Analysis complete")
 
     except FileNotFoundError as e:
-        logger.error(f"Project directory not found: {e}")
-        sys.stdout.write(
+        sys.stderr.write(f"Project directory not found: {e}\n")
+        orig_stdout.write(
             json.dumps({"error": "Project directory not found.", "details": str(e)})
         )
+        orig_stdout.flush()
         sys.exit(1)
     except graphviz.backend.ExecutableNotFound:
-        logger.error("Graphviz not installed.")
-        sys.stdout.write(
+        sys.stderr.write("Graphviz not installed.\n")
+        orig_stdout.write(
             json.dumps(
                 {
                     "error": "Graphviz not installed.",
@@ -1558,11 +1845,12 @@ def analyze_project_cli(
                 }
             )
         )
+        orig_stdout.flush()
         sys.exit(1)
     except Exception as e:
         import traceback
-        logger.error(f"Analysis failed unexpectedly: {traceback.format_exc()}")
-        sys.stdout.write(
+        sys.stderr.write(f"Analysis failed unexpectedly: {traceback.format_exc()}\n")
+        orig_stdout.write(
             json.dumps(
                 {
                     "error": "Analysis failed unexpectedly.",
@@ -1570,25 +1858,30 @@ def analyze_project_cli(
                 }
             )
         )
+        orig_stdout.flush()
         sys.exit(1)
+    finally:
+        sys.stdout = orig_stdout
 
 
 if __name__ == "__main__":
-    # Expects arguments from the Node/Electron process:
-    # [project_path, extensions_str, excluded_str, theme_name, format_name (currently unused)]
-    if len(sys.argv) > 4:
-        analyze_project_cli(
-            sys.argv[1],  # project_path
-            sys.argv[2],  # extensions_str
-            sys.argv[3],  # excluded_str
-            sys.argv[4],  # theme_name
-            "json",  # format_name (defaulting for now)
-        )
-    else:
-        # Fallback for manual testing (e.g., python analyzer_core.py)
-        # Placeholder analysis if run standalone
-        sys.stdout.write(
-            json.dumps(
-                {"status": "Core Engine Ready. Awaiting command."}
-            )
-        )
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="CodeGnosis Analyzer Core")
+    parser.add_argument("project_path", help="Path to the project to analyze")
+    parser.add_argument("extensions", help="Comma-separated extensions to include")
+    parser.add_argument("excluded", help="Comma-separated folders to exclude")
+    parser.add_argument("theme", help="Theme name (Dark/Light)")
+    parser.add_argument("format", help="Output format (json)")
+    parser.add_argument("--progress-file", help="Path to write progress JSON")
+    
+    args = parser.parse_args()
+    
+    analyze_project_cli(
+        args.project_path,
+        args.extensions,
+        args.excluded,
+        args.theme,
+        args.format,
+        args.progress_file
+    )

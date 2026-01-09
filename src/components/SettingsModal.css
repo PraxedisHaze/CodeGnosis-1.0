@@ -19,6 +19,9 @@
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   animation: slideUp 0.3s ease-out;
@@ -57,6 +60,27 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Subtle scrollbar styling */
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .settings-group {
@@ -86,10 +110,61 @@
   border-color: var(--aeth-primary);
 }
 
+.mission-text {
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.8);
+  border-left: 2px solid var(--aeth-primary);
+  padding-left: 1rem;
+  margin-top: 0.5rem;
+}
+
+.partnership-card {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin: 1.5rem 0;
+}
+
+.partnership-card h3 {
+  color: #fff;
+  margin-bottom: 0.5rem;
+}
+
+.partnership-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.partnership-list li {
+  margin-bottom: 0.4rem;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--aeth-primary);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-outline:hover {
+  background: var(--aeth-primary);
+  box-shadow: 0 0 15px rgba(102, 126, 234, 0.4);
+}
+
 .hint {
   font-size: 0.8rem;
-  opacity: 0.6;
-  margin: 0;
+  opacity: 0.5;
+  margin-top: 0.25rem;
 }
 
 .toggle-group label {

@@ -1,7 +1,7 @@
 [package]
 name = "codegnosis"
 version = "1.0.0"
-description = "CodeGnosis - Project Analyzer Star in the Alethéari Constellation"
+description = "CodeGnosis - Project Analyzer Star in the Keystone Constellation"
 authors = []
 license = "ISC"
 repository = "https://github.com/DrakeTimothy/CodeGnosis-1.0-READY-TO-SHIP"
@@ -25,3 +25,5 @@ tauri = { version = "2.9.1", features = [] }
 tauri-plugin-log = "2.0"
 tauri-plugin-dialog = "2.0"
 tauri-plugin-shell = "2.0"
+tauri-plugin-fs = "2.0"
+tauri-plugin-sql = { version = "2.0", features = ["sqlite"] }

@@ -1,5 +1,5 @@
 :root {
-  /* Alethéari Color Palette */
+  /* CodeGnosis Color Palette - Default (Deep Space) */
   --aeth-primary: #667eea;
   --aeth-secondary: #764ba2;
   --aeth-success: #27AE60;
@@ -10,6 +10,12 @@
   --aeth-bg: #1e1e1e;
   --aeth-fg: #e0e0e0;
   --aeth-border: #404040;
+
+  /* Theme-specific variables */
+  --sidebar-bg: linear-gradient(180deg, #111 0%, #0a0a0a 100%);
+  --sidebar-border: #333;
+  --accent-glow: rgba(102, 126, 234, 0.4);
+  --button-highlight: #667eea;
 
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -25,6 +31,56 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Theme: Nebula Purple */
+[data-theme="nebula"] {
+  --aeth-primary: #9b59b6;
+  --aeth-secondary: #8e44ad;
+  --sidebar-bg: linear-gradient(180deg, #1a0a2e 0%, #0d001a 100%);
+  --sidebar-border: #2d1b4e;
+  --accent-glow: rgba(155, 89, 182, 0.4);
+  --button-highlight: #9b59b6;
+}
+
+/* Theme: Cosmos Blue */
+[data-theme="cosmos"] {
+  --aeth-primary: #3498db;
+  --aeth-secondary: #2980b9;
+  --sidebar-bg: linear-gradient(180deg, #0a1628 0%, #000510 100%);
+  --sidebar-border: #152238;
+  --accent-glow: rgba(52, 152, 219, 0.4);
+  --button-highlight: #3498db;
+}
+
+/* Theme: Aurora Green */
+[data-theme="aurora"] {
+  --aeth-primary: #27ae60;
+  --aeth-secondary: #1e8449;
+  --sidebar-bg: linear-gradient(180deg, #0a2818 0%, #001208 100%);
+  --sidebar-border: #0d3d1f;
+  --accent-glow: rgba(39, 174, 96, 0.4);
+  --button-highlight: #27ae60;
+}
+
+/* Theme: Ember Red */
+[data-theme="ember"] {
+  --aeth-primary: #e74c3c;
+  --aeth-secondary: #c0392b;
+  --sidebar-bg: linear-gradient(180deg, #2a0a0a 0%, #100000 100%);
+  --sidebar-border: #3d1515;
+  --accent-glow: rgba(231, 76, 60, 0.4);
+  --button-highlight: #e74c3c;
+}
+
+/* Theme: Twilight */
+[data-theme="twilight"] {
+  --aeth-primary: #9b59b6;
+  --aeth-secondary: #667eea;
+  --sidebar-bg: linear-gradient(180deg, #1a1025 0%, #0a0510 100%);
+  --sidebar-border: #2d1a3d;
+  --accent-glow: rgba(155, 89, 182, 0.4);
+  --button-highlight: #9b59b6;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -36,6 +92,21 @@ body {
   display: flex;
   min-width: 320px;
   min-height: 100vh;
+  background-color: #000000;
+  color: #ffffff;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
+              linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  background-size: 100% 4px, 3px 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.3;
 }
 
 #root {

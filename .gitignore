@@ -66,7 +66,7 @@ test_*.json
 *.bak.*
 
 # Old/renamed binaries
-src-tauri/binaries/aletheari_*
+src-tauri/binaries/codegnosis_*
 
 # Build artifacts
 project_architecture/

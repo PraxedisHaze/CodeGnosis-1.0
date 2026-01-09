@@ -31,7 +31,7 @@ declare global {
 // Initialize window.AETH namespace
 if (typeof window !== 'undefined') {
   window.AETH = {
-    version: '1.0.0',
+    version: '1.1.0',
     appId: 'codegnosis',
     appName: 'CodeGnosis - Project Analyzer',
     capabilities: [
@@ -53,7 +53,7 @@ if (typeof window !== 'undefined') {
   // Register self as a Star
   window.AETH.register({
     id: 'codegnosis',
-    version: '1.0.0',
+    version: '1.1.0',
     capabilities: window.AETH.capabilities,
     offers: {
       analyzeProject: async (projectPath: string) => {

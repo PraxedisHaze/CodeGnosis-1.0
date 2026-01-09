@@ -1,4 +1,4 @@
-ALETHEARI CODEGNOSIS - THIRD PARTY NOTICES
+CODEGNOSIS - THIRD PARTY NOTICES
 =========================================
 
 This project utilizes several open-source libraries. We gratefully acknowledge the contributions of these projects and their maintainers.
@@ -56,4 +56,4 @@ Source: https://github.com/date-fns/date-fns
 ---
 
 This software is provided "as is", without warranty of any kind.
-Alethéari Constellation - Love First.
+Keystone Constellation - Love First.

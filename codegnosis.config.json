@@ -1,4 +1,59 @@
 {
+  "projectInfo": {
+    "name": "CodeGnosis Analysis Config",
+    "version": "1.1.0",
+    "description": "Configuration for CodeGnosis static analysis engine"
+  },
+  "analysisSettings": {
+    "fileSizeLimitMB": 5,
+    "checkCircularDependencies": true,
+    "checkOrphans": true,
+    "checkMissingAssets": true,
+    "scanDepth": 10
+  },
+  "tauri": {
+    "enabled": false,
+    "v2Checks": true
+  },
+  "exclusions": {
+    "directories": [
+      ".git", ".svn", ".hg", ".idea", ".vscode", "__pycache__", "node_modules",
+      "venv", "env", "build", "dist", "target", "bin", "obj",
+      "vendor", "bower_components", "jspm_packages",
+      "android/app/build", "ios/Pods",
+      ".cargo", ".rustup", "target",
+      "coverage", ".nuxt", ".next", "out"
+    ],
+    "files": [
+      "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "cargo.lock",
+      "poetry.lock", "Gemfile.lock", "composer.lock", "mix.lock",
+      ".DS_Store", "Thumbs.db", ".env", ".env.local",
+      "LICENSE", "README.md", "CHANGELOG.md"
+    ],
+    "extensions": [
+      ".exe", ".dll", ".so", ".dylib", ".bin", ".obj", ".o", ".a", ".lib",
+      ".pyc", ".pyo", ".pyd", ".class", ".jar", ".war", ".ear",
+      ".zip", ".tar", ".gz", ".rar", ".7z",
+      ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".bmp", ".tiff", ".webp",
+      ".mp3", ".wav", ".mp4", ".avi", ".mov", ".mkv",
+      ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+      ".log", ".tmp", ".bak", ".swp"
+    ]
+  },
+  "visualization": {
+    "maxNodes": 400,
+    "maxEdges": 900,
+    "categoryColors": {
+      "Logic": "#FF6B6B",
+      "UI": "#4ECDC4",
+      "Data": "#FFE66D",
+      "Asset": "#95A5A6",
+      "Config": "#34495E",
+      "Test": "#A8E6CF",
+      "Utility": "#D4A5A5",
+      "Unknown": "#ECF0F1"
+    }
+  },
   "language_extensions": {
     ".java": "Java", ".jar": "Java", ".class": "Java", ".jav": "Java", ".j": "Java",
     ".war": "Java", ".ear": "Java", ".jmod": "Java",
@@ -30,9 +85,11 @@
     ".xlsx": "Spreadsheet", ".ods": "Spreadsheet", ".csv": "CSV"
   },
   "compliance_checks": {
+    "enabled": true,
     "required_header_text": "",
     "mandatory_files": [],
-    "forbidden_licenses": []
+    "forbidden_licenses": [],
+    "standards": ["basic_security", "no_hardcoded_secrets"]
   },
   "custom_regex_parsers": {
     "java": [

@@ -1,0 +1,59 @@
+{
+  "meta": {
+    "version": "1.0",
+    "last_updated": "2026-01-01",
+    "season_theme": "Spring Cleaning"
+  },
+  "applings": [
+    {
+      "id": "app_001_groundskeeper",
+      "name": "The Groundskeeper",
+      "role": "Sanitation Specialist",
+      "personality": "Obsessive & Clean",
+      "headline": "Dirt doesn't sleep. Neither do I.",
+      "pitch": "Your project has dark corners—unused imports, zombie functions, and comments from 2019. I eat them for breakfast. Adopt me, and I’ll bring my broom.",
+      "ask": "Help me clean up.",
+      "preview_image": "assets/applings/groundskeeper.png",
+      "gift_data": {
+        "type": "dataset",
+        "title": "The Chaos City Dataset",
+        "description": "A pre-broken city to practice your clean-up skills on."
+      },
+      "status": "available", 
+      "action_tag": "adopt_groundskeeper"
+    },
+    {
+      "id": "app_002_weaver",
+      "name": "The Neon Weaver",
+      "role": "Light Architect",
+      "personality": "Visionary & Dreamer",
+      "headline": "Reality is boring. Let's dream.",
+      "pitch": "Gray blocks are fine for accountants. But you? You're a builder. I bring the light, the color, and the pulse. Let's make your code look like the future.",
+      "ask": "Ignite the city.",
+      "preview_image": "assets/applings/weaver.png",
+      "gift_data": {
+        "type": "shader_pack",
+        "title": "Cyber-Grid Shader V1",
+        "description": "Transforms your city into a retro-synthwave aesthetic."
+      },
+      "status": "available", 
+      "action_tag": "adopt_weaver"
+    },
+    {
+      "id": "app_003_historian",
+      "name": "The Historian",
+      "role": "Keeper of Lore",
+      "personality": "Supportive & Ancient",
+      "headline": "I remember you.",
+      "pitch": "I remember the code you wrote at 3 AM three years ago. I am the shadow of your progress.",
+      "preview_image": "assets/applings/shadow.png",
+      "gift_data": {
+        "type": "pdf_lore",
+        "title": "The Architect’s Manifesto",
+        "description": "A guide to building software that lasts."
+      },
+      "status": "locked", 
+      "unlock_hint": "Import your first project to meet this Appling."
+    }
+  ]
+}

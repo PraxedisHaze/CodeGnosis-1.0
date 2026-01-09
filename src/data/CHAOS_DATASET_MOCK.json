@@ -1,0 +1,54 @@
+{
+  "name": "Chaos Project (In Crisis)",
+  "type": "folder",
+  "path": "/root",
+  "children": [
+    {
+      "name": "core",
+      "type": "folder",
+      "path": "/root/core",
+      "children": [
+        {
+          "name": "The_Monolith.js",
+          "type": "file",
+          "metrics": { "loc": 5000, "complexity": 150, "churn": 5, "coverage": 12 },
+          "notes": "A God Class containing all logic. Terrifyingly tall and fat."
+        },
+        {
+          "name": "OldController.js",
+          "type": "file",
+          "metrics": { "loc": 800, "complexity": 85, "churn": 25, "coverage": 5 },
+          "notes": "High churn, no tests. Glowing bright red."
+        }
+      ]
+    },
+    {
+      "name": "assets",
+      "type": "folder",
+      "path": "/root/assets",
+      "children": [
+        { "name": "background_01.png", "type": "file", "metrics": { "loc": 10, "complexity": 1, "churn": 0, "coverage": 100 } },
+        { "name": "background_02.png", "type": "file", "metrics": { "loc": 10, "complexity": 1, "churn": 0, "coverage": 100 } },
+        { "name": "background_03.png", "type": "file", "metrics": { "loc": 10, "complexity": 1, "churn": 0, "coverage": 100 } },
+        { "name": "background_04.png", "type": "file", "metrics": { "loc": 10, "complexity": 1, "churn": 0, "coverage": 100 } },
+        { "name": "background_05.png", "type": "file", "metrics": { "loc": 10, "complexity": 1, "churn": 0, "coverage": 100 } }
+      ],
+      "notes": "The Suburbs. Flat, grey, and vast."
+    },
+    {
+      "name": "legacy",
+      "type": "folder",
+      "path": "/root/legacy",
+      "children": [
+        { "name": "deprecated_utils.ts", "type": "file", "metrics": { "loc": 1200, "complexity": 40, "churn": 2, "coverage": 0 } },
+        { "name": "forgotten_logic.py", "type": "file", "metrics": { "loc": 450, "complexity": 20, "churn": 1, "coverage": 0 } }
+      ],
+      "notes": "The Ruins. Cold and silent."
+    }
+  ],
+  "_meta": {
+    "total_files": 10,
+    "health_score": 35,
+    "warning": "CRITICAL ARCHITECTURAL FRACTURE DETECTED"
+  }
+}

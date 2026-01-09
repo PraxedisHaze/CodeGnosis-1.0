@@ -239,7 +239,7 @@ function buildPythonExecutable(pythonCmd, graphvizDir) {
 // ============================================================================
 
 async function main() {
-  log('=== Alethari Analyzer Core Build ===');
+  log('=== CodeGnosis Analyzer Core Build ===');
   log('Building standalone executable (Zero Overhead Vow)');
   log('');
 
