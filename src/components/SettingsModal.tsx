@@ -41,7 +41,7 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
         
         <div className="modal-body">
           <div className="settings-section">
-            <h3>Human-First Mission</h3>
+            <h3>Coders-First Mission</h3>
             <p className="mission-text">
               "This tool is meant to be good for you. We want to improve your life, not just your code. 
               If you have ideas for the next release, we are listening."

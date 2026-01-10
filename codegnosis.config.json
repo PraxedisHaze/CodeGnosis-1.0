@@ -22,7 +22,8 @@
       "vendor", "bower_components", "jspm_packages",
       "android/app/build", "ios/Pods",
       ".cargo", ".rustup", "target",
-      "coverage", ".nuxt", ".next", "out"
+      "coverage", ".nuxt", ".next", "out",
+      "_archive"
     ],
     "files": [
       "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "cargo.lock",

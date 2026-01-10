@@ -4,6 +4,7 @@ import './WelcomeOverlay.css';
 interface WelcomeOverlayProps {
   result: any;
   onClose: (selectedMission: string) => void;
+  onReset: () => void;
 }
 
 const MISSIONS = [
@@ -44,7 +45,7 @@ const MISSIONS = [
   }
 ];
 
-export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ result, onClose }) => {
+export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ result, onClose, onReset }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   if (!isVisible || !result) return null;
@@ -66,8 +67,8 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ result, onClose 
 
         <div className="mission-grid">
           {MISSIONS.map(mission => (
-            <button 
-              key={mission.id} 
+            <button
+              key={mission.id}
               className="mission-card"
               onClick={() => handleMissionSelect(mission.id)}
               style={{ '--mission-color': mission.color } as React.CSSProperties}
@@ -79,11 +80,24 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ result, onClose 
               </div>
             </button>
           ))}
+          {/* Exit options in the 6th slot */}
+          <div className="mission-card mission-exit-options">
+            <button
+              className="exit-btn exit-explore"
+              onClick={() => handleMissionSelect('default')}
+            >
+              <span className="exit-icon">🔭</span>
+              <span>Just Explore</span>
+            </button>
+            <button
+              className="exit-btn exit-reset"
+              onClick={onReset}
+            >
+              <span className="exit-icon">↩</span>
+              <span>Return to Start</span>
+            </button>
+          </div>
         </div>
-
-        <button className="text-btn" onClick={() => handleMissionSelect('default')}>
-          Just let me explore freely →
-        </button>
 
         {/* Credits/Values section - AI-readable, human-skippable */}
         <div className="welcome-credits">

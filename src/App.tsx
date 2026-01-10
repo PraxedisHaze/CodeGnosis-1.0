@@ -6,7 +6,7 @@
  * Glyphs: BOM-STRICT | USER-TRUTH | RITUAL-VOW | MARKET-REALITY
  */
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
@@ -53,6 +53,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'analysis' | 'graph' | 'codeCity' | 'vault'>('analysis')
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false)
   const [activeMission, setActiveMission] = useState<string | null>(null)
+  const [introComplete, setIntroComplete] = useState(false)
   const [settings, setSettings] = useState({
     theme: 'Dark',
     excluded: 'node_modules,.git,dist,build',
@@ -73,12 +74,9 @@ function App() {
     }
   }, [settings.skybox])
 
-  // Auto-hide welcome overlay after 5 seconds
-  useEffect(() => {
-    if (!showWelcomeOverlay) return
-    const hideTimer = setTimeout(() => setShowWelcomeOverlay(false), 5000)
-    return () => clearTimeout(hideTimer)
-  }, [showWelcomeOverlay])
+  // No auto-hide - user must make a choice
+
+  const handleIntroComplete = useCallback(() => setIntroComplete(true), [])
 
   const selectDirectory = async () => {
     try {
@@ -192,48 +190,51 @@ function App() {
                 starBrightness={settings.starBrightness}
                 skybox={settings.skybox}
                 onNodeClick={(file) => console.log('Selected:', file)}
+                onIntroComplete={handleIntroComplete}
               />
             </ErrorBoundary>
           </div>
         )}
 
-        {/* HUD UI Layer */}
-        <div className="content-shield">
-          {analysisResult && (
-            <div className="tab-row-top">
-              <TabInterface activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} />
-            </div>
-          )}
-          
-          {loading && !analysisResult && (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              <div className="loading-text">Analyzing Project...</div>
-              <div className="loading-subtext">Scanning files, tracing dependencies, building galaxy</div>
-            </div>
-          )}
+        {/* HUD UI Layer - hidden during intro video */}
+        {(introComplete || settings.skipIntroAnimation || !analysisResult) && (
+          <div className="content-shield">
+            {analysisResult && (
+              <div className="tab-row-top">
+                <TabInterface activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} />
+              </div>
+            )}
 
-          {analysisResult && activeTab === 'codeCity' && <CodeCity analysisResult={analysisResult} />}
-          {activeTab === 'vault' && <VaultOfValue />}
+            {loading && !analysisResult && (
+              <div className="loading-state">
+                <div className="spinner"></div>
+                <div className="loading-text">Analyzing Project...</div>
+                <div className="loading-subtext">Scanning files, tracing dependencies, building galaxy</div>
+              </div>
+            )}
 
-          {analysisResult && activeTab === 'analysis' && (
-            <AnalysisReport
-              result={analysisResult}
-              projectPath={projectPath}
-              onOpenFolder={async () => await invoke('open_folder', { path: projectPath })}
-              onCopyPath={async () => await navigator.clipboard.writeText(projectPath)}
-              onFileClick={(file) => console.log('Navigate to:', file)}
-            />
-          )}
+            {analysisResult && activeTab === 'codeCity' && <CodeCity analysisResult={analysisResult} />}
+            {activeTab === 'vault' && <VaultOfValue />}
 
-          {!loading && !analysisResult && (
-            <div className="empty-state">
-              <div className="empty-state-icon">{projectPath ? '🎯' : '📂'}</div>
-              <h2>{projectPath ? projectPath.replace(/\//g, '\\').split('\\').pop() : 'Select a Project'}</h2>
-              <p>{projectPath ? 'Ready to analyze - click "Analyze Project" to begin' : 'Choose a directory to visualize its architecture.'}</p>
-            </div>
-          )}
-        </div>
+            {analysisResult && activeTab === 'analysis' && (
+              <AnalysisReport
+                result={analysisResult}
+                projectPath={projectPath}
+                onOpenFolder={async () => await invoke('open_folder', { path: projectPath })}
+                onCopyPath={async () => await navigator.clipboard.writeText(projectPath)}
+                onFileClick={(file) => console.log('Navigate to:', file)}
+              />
+            )}
+
+            {!loading && !analysisResult && (
+              <div className="empty-state">
+                <div className="empty-state-icon">{projectPath ? '🎯' : '📂'}</div>
+                <h2>{projectPath ? projectPath.replace(/\//g, '\\').split('\\').pop() : 'Select a Project'}</h2>
+                <p>{projectPath ? 'Ready to analyze - click "Analyze Project" to begin' : 'Choose a directory to visualize its architecture.'}</p>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       <SettingsModal 
@@ -243,10 +244,11 @@ function App() {
         initialSettings={settings} 
       />
 
-      {showWelcomeOverlay && analysisResult && (
-        <WelcomeOverlay 
-          result={analysisResult} 
+      {showWelcomeOverlay && analysisResult && (introComplete || settings.skipIntroAnimation) && (
+        <WelcomeOverlay
+          result={analysisResult}
           onClose={(m) => { setShowWelcomeOverlay(false); if (m && m !== 'default') { setActiveMission(m); setActiveTab('graph'); } }}
+          onReset={() => { setShowWelcomeOverlay(false); setProjectPath(''); setAnalysisResult(null); setIntroComplete(false); }}
         />
       )}
     </div>

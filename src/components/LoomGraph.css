@@ -71,7 +71,8 @@
 .controls-panel,
 .loom-legend,
 .loom-search-input,
-.loom-search-results {
+.loom-search-results,
+.loom-control-panel {
   pointer-events: auto; /* Only these specific elements block the graph */
 }
 
@@ -464,32 +465,30 @@
   color: rgba(68, 136, 255, 0.8);
 }
 
-/* Floating Controls - moves left when info panel is open */
+/* Floating Controls - bottom left of graph */
 .loom-floating-controls {
   position: absolute;
-  top: 1rem;
-  right: 1.5rem;
+  bottom: 1rem;
+  left: 1rem;
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap; /* Allow wrapping to prevent overlap */
-  justify-content: flex-end;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.5rem;
   z-index: 150;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
-  max-width: calc(100% - 400px); /* Leave room for header */
+  max-width: calc(100% - 200px);
 }
 
-/* Move controls left when info panel is open */
+/* Adjust when info panel is open */
 .loom-floating-controls.panel-open {
-  right: 340px; /* Move past the 320px + padding panel */
+  /* Stay in bottom-left */
 }
 
-/* If panel is on the left, shift controls to the right */
+/* If panel is on the left, move controls right */
 .loom-floating-controls.panel-open.panel-left {
-  right: 1.5rem;
   left: 340px;
-  justify-content: flex-start;
 }
 
 .loom-btn {
@@ -553,24 +552,21 @@
   margin-top: 0.5rem;
 }
 
-/* Skip Intro Button */
-.skip-intro-btn {
+/* Intro Video Overlay */
+.intro-video-overlay {
   position: absolute;
-  bottom: 2rem;
-  right: 2rem;
-  padding: 0.75rem 1.5rem;
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.9rem;
-  cursor: pointer;
-  z-index: 200;
+  inset: 0;
+  z-index: 500;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: auto;
-  transition: all 0.2s;
 }
 
-.skip-intro-btn:hover {
-  background: rgba(0, 212, 255, 0.3);
-  border-color: rgba(0, 212, 255, 0.6);
+.intro-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
+

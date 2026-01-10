@@ -1,0 +1,56 @@
+/* BOM-STRICT */
+/* Tooltip.css - Smart cursor-aware tooltips */
+
+.tooltip-trigger {
+  display: contents; /* Don't affect layout */
+}
+
+.tooltip-box {
+  position: fixed;
+  z-index: 9999;
+  padding: 0.5rem 0.75rem;
+  background: rgba(15, 18, 28, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  animation: tooltipFade 0.15s ease-out;
+}
+
+.tooltip-line {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #D0D4DC;
+}
+
+.tooltip-line:not(:last-child) {
+  margin-bottom: 0.15rem;
+}
+
+@keyframes tooltipFade {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.tooltip-above {
+  animation: tooltipFadeUp 0.15s ease-out;
+}
+
+@keyframes tooltipFadeUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-100%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-100%);
+  }
+}

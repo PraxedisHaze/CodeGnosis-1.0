@@ -32,6 +32,218 @@ except Exception:
     ghost_protocol = None
 
 
+def get_folder_size(path):
+    """Calculate total size of a folder in bytes."""
+    total = 0
+    try:
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                try:
+                    total += os.path.getsize(fp)
+                except (OSError, FileNotFoundError):
+                    pass
+    except (OSError, PermissionError):
+        pass
+    return total
+
+
+def format_size(bytes_val):
+    """Format bytes as human-readable string."""
+    if bytes_val >= 1024 * 1024 * 1024:
+        return f"{bytes_val / (1024 * 1024 * 1024):.1f} GB"
+    elif bytes_val >= 1024 * 1024:
+        return f"{bytes_val / (1024 * 1024):.1f} MB"
+    elif bytes_val >= 1024:
+        return f"{bytes_val / 1024:.1f} KB"
+    else:
+        return f"{bytes_val} B"
+
+
+def analyze_build_profile(project_path):
+    """
+    Analyze the build profile of a project including dependencies and shipping weight.
+    Returns a buildProfile dict with dev footprint, shipping weight, and dependency lists.
+    """
+    project_path = Path(project_path)
+
+    build_profile = {
+        "devFootprint": {
+            "total": "0 B",
+            "totalBytes": 0,
+            "breakdown": {}
+        },
+        "shippingWeight": {
+            "installers": [],
+            "executables": [],
+            "totalBytes": 0,
+            "total": "0 B"
+        },
+        "dependencies": {
+            "npm": [],
+            "cargo": []
+        }
+    }
+
+    # --- Dev Footprint ---
+    total_dev_bytes = 0
+    breakdown = {}
+
+    # node_modules
+    node_modules_path = project_path / "node_modules"
+    if node_modules_path.exists():
+        nm_size = get_folder_size(node_modules_path)
+        breakdown["node_modules"] = format_size(nm_size)
+        total_dev_bytes += nm_size
+
+        # Get top-level package sizes
+        npm_deps = []
+        for pkg_dir in node_modules_path.iterdir():
+            if pkg_dir.is_dir() and not pkg_dir.name.startswith('.'):
+                pkg_size = get_folder_size(pkg_dir)
+                if pkg_size > 1024 * 1024:  # Only packages > 1MB
+                    npm_deps.append({
+                        "name": pkg_dir.name,
+                        "size": format_size(pkg_size),
+                        "sizeBytes": pkg_size
+                    })
+        npm_deps.sort(key=lambda x: x["sizeBytes"], reverse=True)
+        build_profile["dependencies"]["npm"] = npm_deps[:20]  # Top 20
+
+    # Rust target
+    rust_target_path = project_path / "src-tauri" / "target"
+    if rust_target_path.exists():
+        rt_size = get_folder_size(rust_target_path)
+        breakdown["rustTarget"] = format_size(rt_size)
+        total_dev_bytes += rt_size
+
+    # Source code (src folder)
+    src_path = project_path / "src"
+    if src_path.exists():
+        src_size = get_folder_size(src_path)
+        breakdown["sourceCode"] = format_size(src_size)
+        total_dev_bytes += src_size
+
+    # Total project
+    total_project = get_folder_size(project_path)
+    other_size = total_project - sum([
+        get_folder_size(node_modules_path) if node_modules_path.exists() else 0,
+        get_folder_size(rust_target_path) if rust_target_path.exists() else 0,
+        get_folder_size(src_path) if src_path.exists() else 0
+    ])
+    breakdown["other"] = format_size(max(0, other_size))
+
+    build_profile["devFootprint"]["breakdown"] = breakdown
+    build_profile["devFootprint"]["totalBytes"] = total_project
+    build_profile["devFootprint"]["total"] = format_size(total_project)
+
+    # --- Shipping Weight ---
+    shipping_bytes = 0
+
+    # Check for installers
+    bundle_path = project_path / "src-tauri" / "target" / "release" / "bundle"
+    if bundle_path.exists():
+        # MSI installers
+        msi_path = bundle_path / "msi"
+        if msi_path.exists():
+            for msi in msi_path.glob("*.msi"):
+                msi_size = msi.stat().st_size
+                build_profile["shippingWeight"]["installers"].append({
+                    "name": msi.name,
+                    "type": "msi",
+                    "size": format_size(msi_size),
+                    "sizeBytes": msi_size
+                })
+                shipping_bytes += msi_size
+
+        # NSIS installers
+        nsis_path = bundle_path / "nsis"
+        if nsis_path.exists():
+            for exe in nsis_path.glob("*.exe"):
+                exe_size = exe.stat().st_size
+                build_profile["shippingWeight"]["installers"].append({
+                    "name": exe.name,
+                    "type": "nsis",
+                    "size": format_size(exe_size),
+                    "sizeBytes": exe_size
+                })
+                shipping_bytes += exe_size
+
+    # Check for release executables
+    release_path = project_path / "src-tauri" / "target" / "release"
+    if release_path.exists():
+        for exe in release_path.glob("*.exe"):
+            if "setup" not in exe.name.lower():  # Skip installers already counted
+                exe_size = exe.stat().st_size
+                build_profile["shippingWeight"]["executables"].append({
+                    "name": exe.name,
+                    "size": format_size(exe_size),
+                    "sizeBytes": exe_size
+                })
+
+    build_profile["shippingWeight"]["totalBytes"] = shipping_bytes
+    build_profile["shippingWeight"]["total"] = format_size(shipping_bytes)
+
+    # --- Parse package.json for npm dependencies with versions ---
+    package_json_path = project_path / "package.json"
+    if package_json_path.exists():
+        try:
+            with open(package_json_path, "r", encoding="utf-8") as f:
+                pkg_data = json.load(f)
+
+            deps = pkg_data.get("dependencies", {})
+            dev_deps = pkg_data.get("devDependencies", {})
+
+            # Enrich npm deps with version info
+            for dep in build_profile["dependencies"]["npm"]:
+                dep_name = dep["name"]
+                if dep_name in deps:
+                    dep["version"] = deps[dep_name]
+                    dep["isDev"] = False
+                elif dep_name in dev_deps:
+                    dep["version"] = dev_deps[dep_name]
+                    dep["isDev"] = True
+        except Exception:
+            pass
+
+    # --- Parse Cargo.toml for Rust crates ---
+    cargo_toml_path = project_path / "src-tauri" / "Cargo.toml"
+    if cargo_toml_path.exists():
+        try:
+            with open(cargo_toml_path, "r", encoding="utf-8") as f:
+                cargo_content = f.read()
+
+            # Simple regex parsing for dependencies
+            # [dependencies] section
+            dep_section = re.search(r'\[dependencies\](.*?)(?=\[|$)', cargo_content, re.DOTALL)
+            if dep_section:
+                dep_lines = dep_section.group(1).strip().split('\n')
+                for line in dep_lines:
+                    line = line.strip()
+                    if '=' in line and not line.startswith('#'):
+                        parts = line.split('=', 1)
+                        crate_name = parts[0].strip()
+                        version_part = parts[1].strip()
+
+                        # Extract version from various formats
+                        version = "unknown"
+                        if version_part.startswith('"'):
+                            version = version_part.strip('"')
+                        elif 'version' in version_part:
+                            ver_match = re.search(r'version\s*=\s*"([^"]+)"', version_part)
+                            if ver_match:
+                                version = ver_match.group(1)
+
+                        build_profile["dependencies"]["cargo"].append({
+                            "name": crate_name,
+                            "version": version
+                        })
+        except Exception:
+            pass
+
+    return build_profile
+
+
 def load_codegnosis_config(project_path):
     """
     Load configuration from codegnosis.config.json.
@@ -1641,10 +1853,15 @@ class AnalyzerCore:
                 pass
             detailed_files[file] = file_info
 
+        # Build profile (dev footprint, shipping weight, dependencies)
+        self.emit_progress("buildProfile", 80, "Analyzing build profile and dependencies")
+        build_profile = analyze_build_profile(self.project_dir)
+
         # Final Report Data
         report = {
             "projectName": self.project_dir.name,
             "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "buildProfile": build_profile,
             "summary": {
                 "totalFiles": total_files,
                 "totalConnections": total_connections,

@@ -1,11 +1,16 @@
 .city-hall {
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  background: transparent; /* Pattern shows through */
+  background: rgba(10, 12, 18, 0.85);
+  box-shadow: 0 0 60px 30px rgba(0, 0, 0, 0.8);
+  border-radius: 12px;
   color: #fff;
-  padding: 3rem;
-  padding-top: 5rem;
+  padding: 2rem;
+  padding-top: 4rem;
   overflow: hidden;
 }
 

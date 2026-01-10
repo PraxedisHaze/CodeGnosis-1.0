@@ -2,8 +2,9 @@
 // AnalysisReport.tsx - Full-scale cognitive dashboard
 // Transforms raw analysis data into actionable intelligence
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import './AnalysisReport.css'
+import { Tooltip } from './Tooltip'
 
 interface AnalysisReportProps {
   result: any
@@ -54,8 +55,48 @@ const estimateOnboardingTime = (totalFiles: number, maxDepth: number, cycles: nu
   return { time: `${Math.ceil(hours/40)}w+`, label: 'Deep immersion needed', color: '#E67E22' }
 }
 
+// Minimum professional padding (Material Design / Apple HIG standard)
+const MIN_PADDING = 16 // 1rem
+const MAX_PADDING = 32 // 2rem - comfortable breathing room
+const TOP_OFFSET = 48 // Clear the tab buttons
+
 export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, onFileClick }: AnalysisReportProps) {
   const [expandedSection, setExpandedSection] = useState<string | null>('overview')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [dynamicPadding, setDynamicPadding] = useState(MIN_PADDING)
+
+  // Dynamic padding: fit perfectly or commit to real scroll
+  useEffect(() => {
+    const adjustPadding = () => {
+      if (!containerRef.current) return
+
+      const viewportHeight = window.innerHeight
+      const availableHeight = viewportHeight - TOP_OFFSET
+
+      // Temporarily reset padding to measure true content height
+      containerRef.current.style.paddingTop = `${TOP_OFFSET}px`
+      containerRef.current.style.paddingBottom = `${MIN_PADDING}px`
+      const contentHeight = containerRef.current.scrollHeight
+
+      const gap = availableHeight - contentHeight
+
+      if (gap >= 0) {
+        // Content fits - distribute extra space evenly, capped at MAX_PADDING
+        const extraPadding = Math.min(gap / 2, MAX_PADDING - MIN_PADDING)
+        setDynamicPadding(MIN_PADDING + extraPadding)
+      } else if (gap > -40) {
+        // Almost fits but would have tiny scrollbar - add padding to make scroll meaningful
+        setDynamicPadding(MIN_PADDING + 24)
+      } else {
+        // Real overflow - keep minimum padding, let scroll do its job
+        setDynamicPadding(MIN_PADDING)
+      }
+    }
+
+    adjustPadding()
+    window.addEventListener('resize', adjustPadding)
+    return () => window.removeEventListener('resize', adjustPadding)
+  }, [result, expandedSection])
 
   const stats = result.statistics || {}
   const summary = result.summary || {}
@@ -65,6 +106,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
   const cycles = result.cycles || []
   const brokenRefs = result.brokenReferences || []
   const entryPoints = result.entryPoints || []
+  const buildProfile = result.buildProfile || {}
 
   const health = healthInterpretation(stats.connectivityHealthScore || 0)
   const contextFit = estimateContextFit(summary.totalFiles || 0, stats.avgDependenciesPerFile || 0)
@@ -91,7 +133,14 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
   }
 
   return (
-    <div className="analysis-report">
+    <div
+      ref={containerRef}
+      className="analysis-report"
+      style={{
+        paddingTop: `${TOP_OFFSET}px`,
+        paddingBottom: `${dynamicPadding}px`
+      }}
+    >
       {/* Hero Section - The Big Picture */}
       <header className="report-hero">
         <div className="hero-left">
@@ -106,48 +155,58 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
           )}
         </div>
         <div className="hero-right">
-          <div
-            className="health-ring"
-            style={{
-              '--health-color': health.color,
-              '--health-score': stats.connectivityHealthScore || 0
-            } as any}
-            title="Overall project health score (0-100). Based on circular dependencies, orphaned files, broken references, and code structure. Higher is better - aim for 80+."
-          >
-            <div className="health-score">{stats.connectivityHealthScore || 0}</div>
-            <div className="health-label">{health.label}</div>
-          </div>
+          <Tooltip content="Overall project health score (0-100). Based on circular dependencies, orphaned files, broken references, and code structure. Higher is better - aim for 80+.">
+            <div
+              className="health-ring"
+              style={{
+                '--health-color': health.color,
+                '--health-score': stats.connectivityHealthScore || 0
+              } as any}
+            >
+              <div className="health-score">{stats.connectivityHealthScore || 0}</div>
+              <div className="health-label">{health.label}</div>
+            </div>
+          </Tooltip>
         </div>
       </header>
 
       {/* Command Center - Key Metrics Grid */}
       <section className="command-center">
-        <div className="metric-card primary" title="How many files are in your project. More files = more complexity to manage. This helps you understand the scale of what you're working with.">
-          <div className="metric-icon">FILES</div>
-          <div className="metric-value">{summary.totalFiles || 0}</div>
-          <div className="metric-sublabel">{Object.keys(summary.languages || {}).length} languages</div>
-        </div>
-        <div className="metric-card primary" title="How many connections exist between files (imports, dependencies). High numbers mean files are tightly coupled - changes ripple further.">
-          <div className="metric-icon">LINKS</div>
-          <div className="metric-value">{summary.totalConnections || 0}</div>
-          <div className="metric-sublabel">{stats.avgDependenciesPerFile || 0} avg/file</div>
-        </div>
-        <div className="metric-card primary" title="The longest chain of dependencies (A uses B uses C uses D...). Deep chains are harder for humans AND AI to follow. Keep it shallow when possible.">
-          <div className="metric-icon">DEPTH</div>
-          <div className="metric-value">{stats.maxDependencyChainDepth || 0}</div>
-          <div className="metric-sublabel">layers deep</div>
-        </div>
-        <div className="metric-card primary" title="On average, how many other files are affected when you change one file. High blast radius means changes are risky - test carefully.">
-          <div className="metric-icon">BLAST</div>
-          <div className="metric-value" style={{ color: avgBlastRadius > 5 ? '#E67E22' : '#4CAF50' }}>{avgBlastRadius}</div>
-          <div className="metric-sublabel">avg impact</div>
-        </div>
+        <Tooltip content="How many files are in your project. More files = more complexity to manage. This helps you understand the scale of what you're working with.">
+          <div className="metric-card primary">
+            <div className="metric-icon">FILES</div>
+            <div className="metric-value">{summary.totalFiles || 0}</div>
+            <div className="metric-sublabel">{Object.keys(summary.languages || {}).length} languages</div>
+          </div>
+        </Tooltip>
+        <Tooltip content="How many connections exist between files (imports, dependencies). High numbers mean files are tightly coupled - changes ripple further.">
+          <div className="metric-card primary">
+            <div className="metric-icon">LINKS</div>
+            <div className="metric-value">{summary.totalConnections || 0}</div>
+            <div className="metric-sublabel">{stats.avgDependenciesPerFile || 0} avg/file</div>
+          </div>
+        </Tooltip>
+        <Tooltip content="The longest chain of dependencies (A uses B uses C uses D...). Deep chains are harder for humans AND AI to follow. Keep it shallow when possible.">
+          <div className="metric-card primary">
+            <div className="metric-icon">DEPTH</div>
+            <div className="metric-value">{stats.maxDependencyChainDepth || 0}</div>
+            <div className="metric-sublabel">layers deep</div>
+          </div>
+        </Tooltip>
+        <Tooltip content="On average, how many other files are affected when you change one file. High blast radius means changes are risky - test carefully.">
+          <div className="metric-card primary">
+            <div className="metric-icon">BLAST</div>
+            <div className="metric-value" style={{ color: avgBlastRadius > 5 ? '#E67E22' : '#4CAF50' }}>{avgBlastRadius}</div>
+            <div className="metric-sublabel">avg impact</div>
+          </div>
+        </Tooltip>
       </section>
 
       {/* Intelligence Panels */}
       <div className="intel-grid">
         {/* Technical Debt Indicators */}
-        <section className="intel-panel debt-panel" title="Technical debt is like clutter in your code - it slows you down over time. These meters show problem areas that will cost you time later if not addressed.">
+        <Tooltip content="Technical debt is like clutter in your code - it slows you down over time. These meters show problem areas that will cost you time later if not addressed.">
+        <section className="intel-panel debt-panel">
           <h3 onClick={() => toggleSection('debt')}>
             Technical Debt Indicators
             <span className="toggle">{expandedSection === 'debt' ? '−' : '+'}</span>
@@ -209,9 +268,11 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
             </div>
           </div>
         </section>
+        </Tooltip>
 
         {/* AI Readiness Assessment */}
-        <section className="intel-panel ai-panel" title="How well can AI assistants like ChatGPT or Claude understand your codebase? This tells you if you can paste the whole thing or need to feed it in chunks.">
+        <Tooltip content="How well can AI assistants like ChatGPT or Claude understand your codebase? This tells you if you can paste the whole thing or need to feed it in chunks.">
+        <section className="intel-panel ai-panel">
           <h3 onClick={() => toggleSection('ai')}>
             AI Readiness
             <span className="toggle">{expandedSection === 'ai' ? '−' : '+'}</span>
@@ -249,9 +310,11 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
             </div>
           </div>
         </section>
+        </Tooltip>
 
         {/* Onboarding Intelligence */}
-        <section className="intel-panel onboard-panel" title="How long will it take a new developer (or you, after a break) to understand this codebase? This estimate helps with hiring decisions and project planning.">
+        <Tooltip content="How long will it take a new developer (or you, after a break) to understand this codebase? This estimate helps with hiring decisions and project planning.">
+        <section className="intel-panel onboard-panel">
           <h3 onClick={() => toggleSection('onboard')}>
             Onboarding Intelligence
             <span className="toggle">{expandedSection === 'onboard' ? '−' : '+'}</span>
@@ -279,9 +342,77 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
             </div>
           </div>
         </section>
+        </Tooltip>
+
+        {/* Build Profile */}
+        {buildProfile.devFootprint && (
+          <Tooltip content="How big is your project really? Dev footprint is everything on disk during development. Shipping weight is what users actually download. Big difference = optimization opportunity.">
+          <section className="intel-panel build-panel">
+            <h3 onClick={() => toggleSection('build')}>
+              Build Profile
+              <span className="toggle">{expandedSection === 'build' ? '−' : '+'}</span>
+            </h3>
+            <div className={`panel-content ${expandedSection === 'build' ? 'expanded' : ''}`}>
+              <div className="build-metrics">
+                <div className="build-section">
+                  <div className="build-header">Dev Footprint</div>
+                  <div className="build-total">{buildProfile.devFootprint.total}</div>
+                  <div className="build-breakdown">
+                    {Object.entries(buildProfile.devFootprint.breakdown || {}).map(([key, value]) => (
+                      <div key={key} className="breakdown-item">
+                        <span className="breakdown-label">{key}</span>
+                        <span className="breakdown-value">{value as string}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="build-section">
+                  <div className="build-header">Shipping Weight</div>
+                  <div className="build-total" style={{ color: '#27AE60' }}>
+                    {buildProfile.shippingWeight?.total || 'Not built'}
+                  </div>
+                  {buildProfile.shippingWeight?.installers?.length > 0 && (
+                    <div className="build-installers">
+                      {buildProfile.shippingWeight.installers.map((inst: any) => (
+                        <div key={inst.name} className="installer-item">
+                          <span className="installer-name">{inst.name}</span>
+                          <span className="installer-size">{inst.size}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Dependencies */}
+              {(buildProfile.dependencies?.npm?.length > 0 || buildProfile.dependencies?.cargo?.length > 0) && (
+                <div className="deps-section">
+                  <div className="deps-header">Heavy Dependencies</div>
+                  <div className="deps-list">
+                    {buildProfile.dependencies?.npm?.slice(0, 5).map((dep: any) => (
+                      <div key={dep.name} className="dep-item">
+                        <span className="dep-name">{dep.name}</span>
+                        <span className="dep-version">{dep.version || ''}</span>
+                        <span className="dep-size">{dep.size}</span>
+                      </div>
+                    ))}
+                    {buildProfile.dependencies?.cargo?.slice(0, 3).map((dep: any) => (
+                      <div key={dep.name} className="dep-item rust">
+                        <span className="dep-name">{dep.name}</span>
+                        <span className="dep-version">{dep.version}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+          </Tooltip>
+        )}
 
         {/* Critical Path - Hub Files */}
-        <section className="intel-panel hubs-panel" title="These are the most important files in your project - many other files depend on them. Changes here affect everything. Handle with extra care and testing.">
+        <Tooltip content="These are the most important files in your project - many other files depend on them. Changes here affect everything. Handle with extra care and testing.">
+        <section className="intel-panel hubs-panel">
           <h3 onClick={() => toggleSection('hubs')}>
             Critical Path (Hub Files)
             <span className="badge">{hubFiles.length}</span>
@@ -304,9 +435,11 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
             </div>
           </div>
         </section>
+        </Tooltip>
 
         {/* Entry Points */}
-        <section className="intel-panel entry-panel" title="Start here when learning the codebase. These are the 'front doors' - main files, index files, and app entry points where execution begins.">
+        <Tooltip content="Start here when learning the codebase. These are the 'front doors' - main files, index files, and app entry points where execution begins.">
+        <section className="intel-panel entry-panel">
           <h3 onClick={() => toggleSection('entry')}>
             Entry Points
             <span className="badge">{entryPoints.length}</span>
@@ -328,10 +461,12 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
             </div>
           </div>
         </section>
+        </Tooltip>
 
         {/* Health Warnings */}
         {healthWarnings.length > 0 && (
-          <section className="intel-panel warnings-panel" title="Problems found during analysis. These are issues that could cause bugs, slow builds, or confuse developers. Address high-severity items first.">
+          <Tooltip content="Problems found during analysis. These are issues that could cause bugs, slow builds, or confuse developers. Address high-severity items first.">
+          <section className="intel-panel warnings-panel">
             <h3 onClick={() => toggleSection('warnings')}>
               Health Warnings
               <span className="badge warning">{healthWarnings.length}</span>
@@ -360,11 +495,13 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
               </div>
             </div>
           </section>
+          </Tooltip>
         )}
 
         {/* Circular Dependencies Detail */}
         {cycles.length > 0 && (
-          <section className="intel-panel cycles-panel" title="File A needs B, B needs C, C needs A - an infinite loop! These cause bugs, slow builds, and confuse AI tools. Breaking these cycles should be a priority.">
+          <Tooltip content="File A needs B, B needs C, C needs A - an infinite loop! These cause bugs, slow builds, and confuse AI tools. Breaking these cycles should be a priority.">
+          <section className="intel-panel cycles-panel">
             <h3 onClick={() => toggleSection('cycles')}>
               Circular Dependencies
               <span className="badge danger">{cycles.length}</span>
@@ -390,6 +527,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
               </div>
             </div>
           </section>
+          </Tooltip>
         )}
       </div>
 

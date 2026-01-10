@@ -24,6 +24,16 @@
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
+/* Sidebar on right side */
+.sidebar-right {
+  flex-direction: row-reverse;
+}
+
+.sidebar-right .sidebar {
+  border-right: none;
+  border-left: 1px solid var(--sidebar-border, #333);
+}
+
 .sidebar * {
   max-width: 100%;
   overflow-wrap: break-word;
@@ -143,7 +153,7 @@
   font-weight: bold;
 }
 
-.btn-primary { background: #00d4ff; color: #000; }
+.btn-primary { background: #00d4ff; color: #fff; }
 .btn-success { background: #22c55e; color: #fff; }
 .btn-secondary { background: #333; color: #fff; }
 
@@ -266,4 +276,53 @@
 .hub-count {
   font-size: 0.8rem;
   color: #888;
+}
+
+/* --- Z-LAYER ARCHITECTURE (GLASS & VOID) --- */
+.z-layer-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.immersive-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #000;
+}
+
+.ui-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+}
+
+.ui-overlay > * {
+  pointer-events: auto;
+}
+
+.center-pane {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  max-width: 1200px;
+  max-height: 85vh;
+  z-index: 20;
+}
+
+.glass-card {
+  background: rgba(15, 15, 35, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  padding: 2rem;
+  overflow-y: auto;
 }
