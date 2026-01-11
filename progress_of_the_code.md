@@ -470,3 +470,164 @@ CodeGnosis helps humans understand their code AND helps them talk to AI about th
 We're building the bridge between human spatial reasoning and AI pattern recognition.
 
 Welcome home, self.
+
+---
+
+## SESSION 2026-01-10 (Claude Opus - Continuation)
+
+### CHANGES MADE:
+
+1. **Intro video timing fix** - `introComplete` now resets when new analysis starts (line 101 in App.tsx)
+
+2. **Mission Select improvements:**
+   - Added "Just Explore" and "Return to Start" buttons to 6th grid slot
+   - Removed auto-hide timer - user must make a choice
+   - Modal waits for intro video to complete before showing
+
+3. **Sidebar flip CSS** - Added `.sidebar-right` class to App.css for right-side positioning
+
+4. **Tauri window** - App now starts maximized by default (`"maximized": true` in tauri.conf.json)
+
+5. **Splash screen system:**
+   - `public/splash.png` - static splash image (lemniscate portal)
+   - `index.html` - instant splash via CSS background, preloaded
+   - Splash fades out when React mounts
+   - Startup video in App.tsx REMOVED - single video system in LoomGraph
+
+6. **App.tsx cleanup** - Removed startup video code (showStartupVideo, startupVideoOpacity, skipStartupVideo)
+
+### BLACK GRAPH BUG INVESTIGATION:
+
+**Symptoms:** After intro video plays and fades, graph shows black (no stars visible)
+
+**Investigated:**
+- `isExploding` state: Set to false when video ends (line 237, 341, 367)
+- `filteredGraphData`: Has safety net if filters return 0 nodes (line 325)
+- `nodeThreeObject`: Falls back to Unknown material if category not found (line 669)
+- `containerSize`: Defaults to 800x600, updates from container
+- `sharedMaterials`: Created for all CATEGORY_COLORS including Unknown
+- Video overlay: Only renders when `showIntroVideo` is true
+
+**Not yet investigated:**
+- Camera position after intro
+- ForceGraph3D internal state
+- Three.js scene visibility
+- Console errors during fade transition
+
+**Hypotheses remaining:**
+1. Camera ends up looking at wrong location after intro
+2. ForceGraph3D resets when state changes during fade
+3. ~~`handleVideoEnded` stale closure with `isAppReady`~~ **FIXED**
+
+### FIX APPLIED:
+
+**Root cause:** `handleVideoEnded` callback had `[isAppReady]` as dependency, but the video element kept the OLD callback reference from when component mounted. Even after `isAppReady` became true, the callback still had stale `isAppReady = false`, causing infinite loop.
+
+**Solution:** Added `isAppReadyRef` ref that stays in sync with `isAppReady`. Changed `handleVideoEnded` to read from `isAppReadyRef.current` instead of closure variable. Empty dependency array since it now reads from ref.
+
+```typescript
+const isAppReadyRef = useRef(isAppReady)
+isAppReadyRef.current = isAppReady // Keep ref in sync
+
+const handleVideoEnded = useCallback(() => {
+  if (!isAppReadyRef.current) { // Read from ref, not closure
+    // loop video
+  } else {
+    setVideoPlayedOnce(true)
+  }
+}, []) // Empty deps
+```
+
+### FILES MODIFIED THIS SESSION:
+- `src/App.tsx` - Mission select timing, intro reset, startup video removed
+- `src/App.css` - Sidebar flip, startup video overlay (then removed)
+- `src/components/WelcomeOverlay.tsx` - Exit buttons (Just Explore, Return to Start)
+- `src/components/WelcomeOverlay.css` - Exit button styling
+- `src/components/LoomGraph.tsx` - onIntroComplete callback
+- `src-tauri/tauri.conf.json` - maximized: true
+- `index.html` - Splash screen with preload
+- `public/splash.png` - Splash image added
+
+---
+
+## SESSION 2026-01-10 CONTINUED (Claude Opus)
+
+### APP STARTUP SEQUENCE (FINAL):
+
+1. **Tauri window opens** - backgroundColor black, native splash shows "CODEGNOSIS / LOADING"
+2. **Vite compiles** - Main window loads index.html
+3. **index.html** - Video first frame frozen as splash, "CODEGNOSIS" title, "LOADING" pulsing
+4. **React mounts** - "LOADING" becomes "TAKE FLIGHT" button
+5. **User clicks TAKE FLIGHT** - Video plays (man sprouts wings, flies toward camera)
+6. **Video ends** - Splash fades, main app appears
+
+### ANALYSIS SEQUENCE (FINAL):
+
+1. **User clicks Analyze** - Vortex video (`/intro.mp4`) starts looping
+2. **Analysis runs** - Video continues looping
+3. **Analysis completes** - Video fades to black over ~1 second
+4. **Mission Select appears** - Over black background (graph NOT visible yet)
+5. **User selects mission** - Mission Select closes, graph reveals
+
+### CHANGES MADE (CONTINUED SESSION):
+
+1. **Native Tauri splash window** - Shows "CODEGNOSIS / LOADING" immediately on app launch
+   - `src-tauri/src/lib.rs` - Added WebviewWindowBuilder with data URL for splash
+   - `src-tauri/Cargo.toml` - Added `webview-data-url` feature to tauri
+
+2. **Intro video system** - Video as splash, frozen on first frame until user clicks
+   - `index.html` - Complete rewrite with video splash, TAKE FLIGHT button
+   - Video plays seamlessly when clicked (no black flash)
+
+3. **Analysis video overlay** - Vortex loops during analysis
+   - `src/App.tsx` - Added `showAnalysisVideo`, `analysisVideoOpacity`, `graphReady` state
+   - `src/App.css` - Added `.analysis-video-overlay` styles
+   - Video fades to black, then Mission Select shows
+
+4. **Settings cleanup**:
+   - Removed "Join the Constellation" mod partnership card
+   - Renamed "Prepare AI Bundle (Auto-save context)" to "Auto-export AI Context" with helpful hint
+
+5. **Sidebar styling**:
+   - Settings and flip buttons now same size (32x32), spaced nicely
+   - Sidebar has gradient background (`#0d1117` → `#161b22` → `#0d1117`)
+   - Blue-tinted border
+
+### KEY FILES:
+
+- `index.html` - Startup sequence with video splash and TAKE FLIGHT button
+- `src/App.tsx` - Analysis video overlay, state management
+- `src/App.css` - Video overlay styles, sidebar button styles
+- `src/components/SettingsModal.tsx` - Cleaned up settings
+- `src-tauri/src/lib.rs` - Native splash window
+- `src-tauri/Cargo.toml` - webview-data-url feature
+- `public/intro.mp4` - Vortex video (used for analysis loop)
+- `public/intro_startup.mp4` - Take Flight video (man with wings)
+
+### VIDEO FILES:
+- `/intro.mp4` - Vortex/lemniscate animation for analysis loop
+- `/intro_startup.mp4` - Man with wings flying (CodeGnosisTakesFlight upscaled)
+- `/splash.png` - Still image of man (first frame of video)
+
+### STATE FLOW:
+```
+App Launch:
+  showAnalysisVideo: false
+  graphReady: false
+  introComplete: false
+  showWelcomeOverlay: false
+
+User clicks Analyze:
+  showAnalysisVideo: true (video loops)
+  loading: true
+
+Analysis completes:
+  analysisVideoOpacity: 1 → 0 (fade)
+  showAnalysisVideo: false
+  showWelcomeOverlay: true
+  introComplete: true
+
+User picks mission:
+  showWelcomeOverlay: false
+  graphReady: true (graph now visible)
+```

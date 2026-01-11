@@ -1,162 +1,100 @@
 .lcp {
   position: absolute;
-  z-index: 300;
-  background: rgba(8, 10, 18, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  width: 340px;
+  background: rgba(10, 10, 20, 0.85);
   backdrop-filter: blur(12px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  pointer-events: auto;
-  min-width: 240px;
-}
-
-.lcp-collapsed {
-  padding: 10px 14px;
-  cursor: pointer;
-  font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.lcp-header {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #fff;
+  z-index: 500;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  cursor: grab;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   user-select: none;
 }
 
-.lcp-header:active {
-  cursor: grabbing;
-}
-
-.lcp-header span {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.5);
+.lcp-header {
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: grab;
+  font-size: 0.9rem;
   font-weight: 600;
-}
-
-.lcp-header button {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0 4px;
-}
-
-.lcp-header button:hover {
-  color: #fff;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .lcp-body {
   padding: 12px;
-  max-height: 70vh;
+  max-height: 80vh;
   overflow-y: auto;
 }
 
-.lcp-body::-webkit-scrollbar {
-  width: 4px;
-}
-
-.lcp-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
-}
-
-/* Sections */
+/* SECTION HEADERS */
 .lcp-section {
   margin-bottom: 16px;
 }
 
-.lcp-section:last-child {
-  margin-bottom: 0;
-}
-
 .lcp-section-title {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.4);
-  margin-bottom: 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
 }
 
 .lcp-clickable {
   cursor: pointer;
+  color: #00d4ff;
 }
 
-.lcp-clickable:hover {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.lcp-clickable span {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.3);
-}
-
-/* Legend Grid - 2 columns, auto rows */
+/* LEGEND GRID (2 COLUMNS) */
 .lcp-legend-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px 12px;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .lcp-legend-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
+  gap: 8px;
+  padding: 6px 10px;
   border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid transparent;
-  transition: all 0.15s;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.8rem;
+}
+
+/* NEON RAZOR: Active state with thin bright orange border */
+.lcp-legend-item.active {
+  border: 1px solid #FF4500 !important; /* Neon Orange Razor */
+  box-shadow: 0 0 8px rgba(255, 69, 0, 0.2);
 }
 
 .lcp-legend-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 69, 0, 0.4);
 }
 
-.lcp-legend-item.active {
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.lcp-legend-item input[type="checkbox"] {
-  width: 13px;
-  height: 13px;
-  accent-color: #00d4ff;
-  cursor: pointer;
-  margin: 0;
-}
+/* Dim Fill based on family color (applied via inline style in TSX) */
 
 .lcp-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 0 6px currentColor;
+  border: none;
+  padding: 0;
+  box-shadow: 0 0 10px currentColor; /* Glow effect */
 }
 
-.lcp-legend-item span {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.8);
-  white-space: nowrap;
-}
-
-/* Calibration Sliders */
+/* CALIBRATION SLIDERS */
 .lcp-calibration {
   display: flex;
   flex-direction: column;
@@ -170,61 +108,29 @@
 }
 
 .lcp-slider label {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.lcp-slider label small {
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.65rem;
-  margin-left: 4px;
+  font-size: 0.75rem;
+  color: #ccc;
+  display: flex;
+  justify-content: space-between;
 }
 
 .lcp-slider input[type="range"] {
   width: 100%;
-  height: 4px;
-  -webkit-appearance: none;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  outline: none;
-}
-
-.lcp-slider input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  background: #00d4ff;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
-}
-
-.lcp-slider input[type="range"]::-webkit-slider-thumb:hover {
-  background: #fff;
+  accent-color: #00d4ff;
 }
 
 .lcp-slider span {
+  font-family: monospace;
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: #00d4ff;
   text-align: right;
 }
 
 .lcp-slider select {
-  width: 100%;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
+  background: #161b22;
   color: #fff;
+  border: 1px solid #333;
+  padding: 4px;
+  border-radius: 4px;
   font-size: 0.8rem;
-  cursor: pointer;
-  outline: none;
-}
-
-.lcp-slider select:hover {
-  border-color: rgba(0, 212, 255, 0.4);
-}
-
-.lcp-slider select option {
-  background: #1a1a2e;
 }

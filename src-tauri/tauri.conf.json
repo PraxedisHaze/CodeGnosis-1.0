@@ -21,7 +21,8 @@
         "maximized": true,
         "center": true,
         "maximizable": true,
-        "label": "main"
+        "label": "main",
+        "backgroundColor": [0, 0, 0, 255]
       }
     ],
     "security": {

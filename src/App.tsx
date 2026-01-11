@@ -6,7 +6,7 @@
  * Glyphs: BOM-STRICT | USER-TRUTH | RITUAL-VOW | MARKET-REALITY
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
@@ -18,6 +18,8 @@ import { LoomGraph } from './components/LoomGraph'
 import { CodeCity } from './components/CodeCity'
 import { VaultOfValue } from './components/VaultOfValue'
 import { AnalysisReport } from './components/AnalysisReport'
+import { Tooltip } from './components/Tooltip'
+import { tooltips, getTooltip, VerbosityLevel } from './components/TooltipContent'
 import './App.css'
 
 // MAVERICK: Gnostic Shield (Error Boundary)
@@ -54,6 +56,13 @@ function App() {
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false)
   const [activeMission, setActiveMission] = useState<string | null>(null)
   const [introComplete, setIntroComplete] = useState(false)
+  const [showAnalysisVideo, setShowAnalysisVideo] = useState(false)
+  const [analysisVideoOpacity, setAnalysisVideoOpacity] = useState(1)
+  const [graphReady, setGraphReady] = useState(false)
+  const [dartAnimating, setDartAnimating] = useState(false)
+  const [boardHit, setBoardHit] = useState(false)
+  const [dartQuivering, setDartQuivering] = useState(false)
+  const analysisVideoRef = useRef<HTMLVideoElement>(null)
   const [settings, setSettings] = useState({
     theme: 'Dark',
     excluded: 'node_modules,.git,dist,build',
@@ -62,8 +71,20 @@ function App() {
     skipIntroAnimation: false,
     twinkleIntensity: 0.5,
     starBrightness: 1.0,
-    skybox: 'none'
+    skybox: 'none',
+    tooltipLevel: 'professional' as VerbosityLevel
   })
+
+  // Close splash screens when React is ready
+  useEffect(() => {
+    // Close native Tauri splash window immediately
+    invoke('close_splash').catch(() => {})
+
+    // Close HTML splash (with 3 second minimum wait)
+    if ((window as any).__closeSplash) {
+      (window as any).__closeSplash()
+    }
+  }, [])
 
   // Apply theme on settings change
   useEffect(() => {
@@ -73,8 +94,6 @@ function App() {
       document.documentElement.setAttribute('data-theme', settings.skybox);
     }
   }, [settings.skybox])
-
-  // No auto-hide - user must make a choice
 
   const handleIntroComplete = useCallback(() => setIntroComplete(true), [])
 
@@ -88,6 +107,22 @@ function App() {
       if (selected && typeof selected === 'string') {
         setProjectPath(selected)
         setError(null)
+        // Trigger dart animation sequence
+        setDartAnimating(true)
+        setBoardHit(true) // Start board reaction state
+        setDartQuivering(false)
+        
+        // Phase 1: Flight ends, Quiver starts (0.7s)
+        setTimeout(() => {
+          setDartAnimating(false)
+          setDartQuivering(true)
+          
+          // Phase 2: Quiver ends (0.7s + 0.5s = 1.2s)
+          setTimeout(() => setDartQuivering(false), 500)
+          
+          // Phase 3: Board recoil ends (0.7s + 0.53s = 1.23s)
+          setTimeout(() => setBoardHit(false), 530)
+        }, 700)
       }
     } catch (error) {
       setError('Failed to select directory')
@@ -98,6 +133,11 @@ function App() {
     if (!projectPath) return
     setLoading(true)
     setError(null)
+    setIntroComplete(false)
+    setGraphReady(false)
+    // setShowAnalysisVideo(true)
+    // setAnalysisVideoOpacity(1)
+
     try {
       const result = await invoke('analyze', {
         projectPath,
@@ -106,7 +146,26 @@ function App() {
         theme: settings.theme
       })
       setAnalysisResult(result)
+
+      // VIDEO BYPASS: Skip fade interval, show Mission Select immediately
       setShowWelcomeOverlay(true)
+      setIntroComplete(true)
+      /* 
+      let opacity = 1
+      const fadeInterval = setInterval(() => {
+        opacity -= 0.02
+        if (opacity <= 0) {
+          clearInterval(fadeInterval)
+          setShowAnalysisVideo(false)
+          setAnalysisVideoOpacity(0)
+          setShowWelcomeOverlay(true)
+          setIntroComplete(true)
+        } else {
+          setAnalysisVideoOpacity(opacity)
+        }
+      }, 20)
+      */
+
       if (settings.autoSave) {
         try {
           const bundlePath = await join(projectPath, 'ai-bundle.json')
@@ -115,6 +174,7 @@ function App() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+      setShowAnalysisVideo(false)
     } finally {
       setLoading(false)
     }
@@ -134,18 +194,37 @@ function App() {
           <h1>CodeGnosis</h1>
           <p className="subtitle">Project Analyzer Star</p>
           <div className="header-actions">
-            <button className="btn-icon" onClick={() => setIsSettingsOpen(true)}>⚙️</button>
-            <button className="btn-toggle-side" onClick={() => setSidebarPosition(p => p === 'left' ? 'right' : 'left')}>
-              {sidebarPosition === 'left' ? '→' : '←'}
-            </button>
+            <Tooltip content={getTooltip(tooltips.sidebar.settings, settings.tooltipLevel)}>
+              <button className="btn-icon" onClick={() => setIsSettingsOpen(true)}>⚙️</button>
+            </Tooltip>
+            <Tooltip content={getTooltip(tooltips.sidebar.toggleSide, settings.tooltipLevel)}>
+              <button className="btn-toggle-side" onClick={() => setSidebarPosition(p => p === 'left' ? 'right' : 'left')}>
+                {sidebarPosition === 'left' ? '→' : '←'}
+              </button>
+            </Tooltip>
           </div>
         </div>
         <div className="sidebar-controls">
-          <button onClick={selectDirectory} disabled={!!projectPath} className="btn btn-primary btn-full">Select Directory</button>
-          <button onClick={analyzeProject} disabled={!projectPath || loading || !!analysisResult} className="btn btn-success btn-full">
-            {loading ? 'Analyzing...' : 'Analyze Project'}
-          </button>
-          <button onClick={() => { setProjectPath(''); setAnalysisResult(null); setError(null); }} className="btn btn-secondary btn-full">Reset</button>
+          {!projectPath ? (
+            <Tooltip content={getTooltip(tooltips.sidebar.selectDirectory, settings.tooltipLevel)}>
+              <button onClick={selectDirectory} className="btn btn-primary btn-hero-large">
+                <span className="hero-text-top">SELECT</span>
+                <span className="hero-text-bottom">DIRECTORY</span>
+              </button>
+            </Tooltip>
+          ) : (
+            <>
+              <Tooltip content={getTooltip(tooltips.sidebar.analyze, settings.tooltipLevel)}>
+                <button onClick={analyzeProject} disabled={loading || !!analysisResult} className="btn btn-success btn-full btn-hero-analyze">
+                  {loading ? 'Analyzing...' : 'IGNITE ENGINE'}
+                </button>
+              </Tooltip>
+              <div className="sidebar-controls-row">
+                 <button onClick={selectDirectory} className="btn btn-secondary btn-small" disabled={loading}>Change</button>
+                 <button onClick={() => { setProjectPath(''); setAnalysisResult(null); setError(null); }} className="btn btn-secondary btn-small">Reset</button>
+              </div>
+            </>
+          )}
         </div>
         {projectPath && (
           <div className="sidebar-section">
@@ -159,14 +238,20 @@ function App() {
           <div className="sidebar-section">
             <h3>Quick Stats</h3>
             <div className="sidebar-stats">
-              <div className="sidebar-stat"><span className="stat-value">{analysisResult.summary?.totalFiles || 0}</span><span className="stat-label">Files</span></div>
-              <div className="sidebar-stat"><span className="stat-value">{analysisResult.summary?.totalConnections || 0}</span><span className="stat-label">Links</span></div>
-              <div className="sidebar-stat">
-                <span className="stat-value" style={{ color: (analysisResult.statistics?.connectivityHealthScore || 0) >= 80 ? '#4CAF50' : '#FF9800' }}>
-                  {analysisResult.statistics?.connectivityHealthScore || 0}
-                </span>
-                <span className="stat-label">Health</span>
-              </div>
+              <Tooltip content={getTooltip(tooltips.stats.files, settings.tooltipLevel)}>
+                <div className="sidebar-stat"><span className="stat-value">{analysisResult.summary?.totalFiles || 0}</span><span className="stat-label">Files</span></div>
+              </Tooltip>
+              <Tooltip content={getTooltip(tooltips.stats.links, settings.tooltipLevel)}>
+                <div className="sidebar-stat"><span className="stat-value">{analysisResult.summary?.totalConnections || 0}</span><span className="stat-label">Links</span></div>
+              </Tooltip>
+              <Tooltip content={getTooltip(tooltips.stats.health, settings.tooltipLevel)}>
+                <div className="sidebar-stat">
+                  <span className="stat-value" style={{ color: (analysisResult.statistics?.connectivityHealthScore || 0) >= 80 ? '#4CAF50' : '#FF9800' }}>
+                    {analysisResult.statistics?.connectivityHealthScore || 0}
+                  </span>
+                  <span className="stat-label">Health</span>
+                </div>
+              </Tooltip>
             </div>
           </div>
         )}
@@ -189,6 +274,7 @@ function App() {
                 twinkleIntensity={settings.twinkleIntensity}
                 starBrightness={settings.starBrightness}
                 skybox={settings.skybox}
+                tooltipLevel={settings.tooltipLevel}
                 onNodeClick={(file) => console.log('Selected:', file)}
                 onIntroComplete={handleIntroComplete}
               />
@@ -201,7 +287,7 @@ function App() {
           <div className="content-shield">
             {analysisResult && (
               <div className="tab-row-top">
-                <TabInterface activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} />
+                <TabInterface activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} tooltipLevel={settings.tooltipLevel} />
               </div>
             )}
 
@@ -228,7 +314,18 @@ function App() {
 
             {!loading && !analysisResult && (
               <div className="empty-state">
-                <div className="empty-state-icon">{projectPath ? '🎯' : '📂'}</div>
+                <div className="empty-state-icon">
+                  {projectPath ? (
+                    <div className="dart-target-container">
+                      <img src="/Dartboard.png" alt="" className={`dartboard-img ${boardHit ? 'dart-hit' : ''}`} />
+                      <img
+                        src="/Dart.png"
+                        alt=""
+                        className={`dart-img ${dartAnimating ? 'dart-flying' : ''} ${dartQuivering ? 'dart-quiver' : ''} ${!dartAnimating && !dartQuivering ? 'dart-landed' : ''}`}
+                      />
+                    </div>
+                  ) : '📂'}
+                </div>
                 <h2>{projectPath ? projectPath.replace(/\//g, '\\').split('\\').pop() : 'Select a Project'}</h2>
                 <p>{projectPath ? 'Ready to analyze - click "Analyze Project" to begin' : 'Choose a directory to visualize its architecture.'}</p>
               </div>
@@ -247,10 +344,28 @@ function App() {
       {showWelcomeOverlay && analysisResult && (introComplete || settings.skipIntroAnimation) && (
         <WelcomeOverlay
           result={analysisResult}
-          onClose={(m) => { setShowWelcomeOverlay(false); if (m && m !== 'default') { setActiveMission(m); setActiveTab('graph'); } }}
-          onReset={() => { setShowWelcomeOverlay(false); setProjectPath(''); setAnalysisResult(null); setIntroComplete(false); }}
+          onClose={(m) => { setShowWelcomeOverlay(false); setGraphReady(true); if (m && m !== 'default') { setActiveMission(m); setActiveTab('graph'); } }}
+          onReset={() => { setShowWelcomeOverlay(false); setProjectPath(''); setAnalysisResult(null); setIntroComplete(false); setGraphReady(false); }}
         />
       )}
+
+      {/* Analysis video overlay - fades to black when done */}
+      {showAnalysisVideo && (
+        <div
+          className="analysis-video-overlay"
+          style={{ opacity: analysisVideoOpacity }}
+        >
+          <video
+            ref={analysisVideoRef}
+            className="analysis-video"
+            src="/intro.mp4"
+            autoPlay
+            muted
+            playsInline
+          />
+        </div>
+      )}
+
     </div>
   )
 }

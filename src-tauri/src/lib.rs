@@ -4,8 +4,9 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State};
+use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct AnalyzerOutput {
     #[serde(rename = "resultFile")]
@@ -363,6 +364,14 @@ async fn open_in_editor(file_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn close_splash(app_handle: tauri::AppHandle) -> Result<(), String> {
+    if let Some(splash) = app_handle.get_webview_window("splash") {
+        let _ = splash.close();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn open_folder(path: String) -> Result<(), String> {
     log::info!("Opening folder: {}", path);
 
@@ -394,7 +403,7 @@ pub fn run() {
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_sql::Builder::default().build())
-    .invoke_handler(tauri::generate_handler![analyze, get_analysis_progress, open_in_editor, open_folder])
+    .invoke_handler(tauri::generate_handler![analyze, get_analysis_progress, open_in_editor, open_folder, close_splash])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -403,13 +412,40 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      // Splash: Shows CODEGNOSIS LOADING text only (image handled in main window's index.html)
+      let splash_html = "data:text/html,%3C!doctype%20html%3E%3Chtml%3E%3Chead%3E%3Cstyle%3E\
+*%7Bmargin:0;padding:0%7D\
+html,body%7Bwidth:100%25;height:100%25;background:%23000;font-family:system-ui,sans-serif;overflow:hidden%7D\
+.c%7Bposition:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem%7D\
+.t%7Bfont-size:2.5rem;font-weight:700;letter-spacing:0.3em;color:%23fff;text-shadow:0%200%2020px%20rgba(100,180,255,0.8)%7D\
+.l%7Bfont-size:0.9rem;letter-spacing:0.4em;color:rgba(150,200,255,0.7);animation:p%201.5s%20ease-in-out%20infinite%7D\
+@keyframes%20p%7B0%25,100%25%7Bopacity:0.4%7D50%25%7Bopacity:1%7D%7D\
+%3C/style%3E%3C/head%3E%3Cbody%3E\
+%3Cdiv%20class=%22c%22%3E%3Cdiv%20class=%22t%22%3ECODEGNOSIS%3C/div%3E%3Cdiv%20class=%22l%22%3ELOADING%3C/div%3E%3C/div%3E\
+%3C/body%3E%3C/html%3E";
+
+      let _splash = WebviewWindowBuilder::new(
+        app,
+        "splash",
+        WebviewUrl::External(splash_html.parse().unwrap())
+      )
+      .title("CodeGnosis")
+      .maximized(true)
+      .decorations(false)
+      .always_on_top(true)
+      .skip_taskbar(true)
+      .build()?;
+
       Ok(())
     })
     .on_window_event(|window, event| {
-      // Exit entire application when main window is closed
+      // Exit entire application only when MAIN window is closed (not splash)
       if let tauri::WindowEvent::CloseRequested { .. } = event {
-        log::info!("Window closed, exiting application");
-        std::process::exit(0);
+        if window.label() == "main" {
+          log::info!("Main window closed, exiting application");
+          std::process::exit(0);
+        }
       }
     })
     .run(tauri::generate_context!())

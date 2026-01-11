@@ -1,6 +1,7 @@
 // BOM-STRICT
 import { useState, useEffect } from 'react'
 import './SettingsModal.css'
+import { VerbosityLevel } from './TooltipContent'
 
 interface Settings {
   theme: string;
@@ -11,6 +12,7 @@ interface Settings {
   twinkleIntensity: number;
   starBrightness: number;
   skybox: string;
+  tooltipLevel: VerbosityLevel;
 }
 
 interface SettingsModalProps {
@@ -60,19 +62,6 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
             <p className="hint">Keep the galaxy clean by skipping these folders.</p>
           </div>
 
-          <div className="settings-section partnership-card">
-            <h3>Join the Constellation</h3>
-            <p>Design mods for our apps and keep **75% of the net profit.**</p>
-            <ul className="partnership-list">
-              <li>• Submit your unique mods or mini-apps for approval.</li>
-              <li>• Profits are calculated after caring for project needs, expenses, and reinvestment in websites and advertising.</li>
-              <li>• We track your sales individually and pay you 75% of the remaining profit.</li>
-            </ul>
-            <button className="btn btn-outline" onClick={() => window.open('mailto:timothy@aletheari.com?subject=Constellation Mod Submission')}>
-              Become a Partner
-            </button>
-          </div>
-
           <div className="settings-group toggle-group">
             <label>
               <input
@@ -80,8 +69,9 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
                 checked={settings.autoSave}
                 onChange={e => setSettings({...settings, autoSave: e.target.checked})}
               />
-              Prepare AI Bundle (Auto-save context)
+              Auto-export AI Context
             </label>
+            <p className="hint">Save a JSON file after analysis that you can paste into AI chats for instant codebase understanding.</p>
           </div>
 
           <div className="settings-group toggle-group">
@@ -131,6 +121,19 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
               <option value="twilight">Twilight</option>
             </select>
             <p className="hint">Changes sidebar, skybox, and accent colors</p>
+          </div>
+
+          <div className="settings-group">
+            <label>Tooltip Detail Level</label>
+            <select
+              value={settings.tooltipLevel}
+              onChange={e => setSettings({...settings, tooltipLevel: e.target.value as VerbosityLevel})}
+            >
+              <option value="friendly">Friendly (casual, encouraging)</option>
+              <option value="professional">Professional (clear, warm)</option>
+              <option value="technical">Technical (precise, detailed)</option>
+            </select>
+            <p className="hint">How tooltips explain things when you hover</p>
           </div>
         </div>
 

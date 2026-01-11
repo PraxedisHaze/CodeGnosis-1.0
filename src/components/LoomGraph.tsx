@@ -12,6 +12,7 @@ import * as THREE from 'three'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { forceManyBody, forceLink, forceCenter } from 'd3-force-3d'
 import { LoomControlPanel } from './LoomControlPanel'
+import { VerbosityLevel } from './TooltipContent'
 import './LoomGraph.css'
 
 interface LoomGraphProps {
@@ -25,6 +26,7 @@ interface LoomGraphProps {
   twinkleIntensity?: number
   starBrightness?: number
   skybox?: string
+  tooltipLevel?: VerbosityLevel
   onNodeClick?: (file: string) => void
   onIntroComplete?: () => void
 }
@@ -169,7 +171,7 @@ function createSkyboxTexture(topColor: string, bottomColor: string, horizonColor
   return texture
 }
 
-export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, brokenReferences, activeMission, skipIntroAnimation, twinkleIntensity = 0.5, starBrightness: initialStarBrightness = 1.0, skybox = 'none', onNodeClick, onIntroComplete }: LoomGraphProps) {
+export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, brokenReferences, activeMission, skipIntroAnimation, twinkleIntensity = 0.5, starBrightness: initialStarBrightness = 1.0, skybox = 'none', tooltipLevel = 'professional', onNodeClick, onIntroComplete }: LoomGraphProps) {
   // --- 1. STATE & REFS ---
   const fgRef = useRef<any>()
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
@@ -182,9 +184,9 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
   const [hoverNode, setHoverNode] = useState<GraphNode | null>(null)
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 })
   
-  const [bloomIntensity, setBloomIntensity] = useState(0.4)
+  const [bloomIntensity, setBloomIntensity] = useState(1.35)
   const [linkOpacity, setLinkOpacity] = useState(0.4)
-  const [starSize, setStarSize] = useState(3.0)
+  const [starSize, setStarSize] = useState(0.3)
   const [starBrightness, setStarBrightness] = useState(initialStarBrightness)
   const [chargeStrength, setChargeStrength] = useState(-40)
   const [dragEnabled, setDragEnabled] = useState(false)
@@ -193,20 +195,22 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
   const explosionProgressRef = useRef(0)
   const missionProgressRef = useRef(0)
   const formationProgress = useRef(0)
-  const [showIntroVideo, setShowIntroVideo] = useState(!skipIntroAnimation)
-  const [introVideoOpacity, setIntroVideoOpacity] = useState(1)
-  const [videoPlayedOnce, setVideoPlayedOnce] = useState(false)
+  // FORCE VISIBILITY: Intro OFF by default for debugging
+  const [showIntroVideo, setShowIntroVideo] = useState(false) 
+  const [introVideoOpacity, setIntroVideoOpacity] = useState(0)
+  const [videoPlayedOnce, setVideoPlayedOnce] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [isExploding, setIsExploding] = useState(!skipIntroAnimation)
+  const [isExploding, setIsExploding] = useState(false)
   const isAnimating = useRef(false)
   const storedForces = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const cameraInitialized = useRef(false)
   const starfieldRef = useRef<{ colors: Float32Array, baseColors: Float32Array, phases: Float32Array } | null>(null)
   const twinkleAnimationRef = useRef<number | null>(null)
-  const bloomPassRef = useRef<UnrealBloomPass | null>(null)
+  const bloomPassRef = useRef<any | null>(null)
 
-  // --- STALE CLOSURE FIX: REFS FOR ANIMATION ---
+  // FORCE OPACITY: 1.0
+  const [canvasOpacity, setCanvasOpacity] = useState(1)
   const twinkleIntensityRef = useRef(twinkleIntensity)
   const starBrightnessRef = useRef(starBrightness)
 
@@ -221,10 +225,22 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
 
   // Determine if app is ready (stars can be shown)
   const isAppReady = totalFiles > 0
+  const isAppReadyRef = useRef(isAppReady)
+  isAppReadyRef.current = isAppReady // Keep ref in sync
 
   // Handle intro video fade-out when ready
   useEffect(() => {
     if (!showIntroVideo) return
+
+    // Preload buffer: Wait 1s before playing to prevent stutter
+    const bufferTimer = setTimeout(() => {
+        if (videoRef.current) {
+            videoRef.current.play().catch(() => {
+                // Autoplay blocked or failed - force end
+                setVideoPlayedOnce(true)
+            })
+        }
+    }, 1000)
 
     // If video played once AND app is ready, start fade out
     if (videoPlayedOnce && isAppReady) {
@@ -243,11 +259,12 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       }, 16) // ~60fps
       return () => clearInterval(fadeInterval)
     }
+    return () => clearTimeout(bufferTimer)
   }, [videoPlayedOnce, isAppReady, showIntroVideo, onIntroComplete])
 
   // Handle video ended - either loop or mark as played once
   const handleVideoEnded = useCallback(() => {
-    if (!isAppReady) {
+    if (!isAppReadyRef.current) {
       // Still loading - loop the video
       if (videoRef.current) {
         videoRef.current.currentTime = 0
@@ -257,7 +274,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       // App ready - mark video as played, will trigger fade
       setVideoPlayedOnce(true)
     }
-  }, [isAppReady])
+  }, [])
 
   // --- 2. DATA PROCESSING (MOVED TO TOP) ---
   const { graphData } = useMemo(() => {
@@ -427,16 +444,14 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       isAnimating.current = false
       formationProgress.current = 0
       const fg = fgRef.current
-      const graph = fg.graphData()
-      if (graph?.nodes) {
-        graph.nodes.forEach((node: any) => {
-          node.fx = undefined
-          node.fy = undefined
-          node.fz = undefined
-        })
-      }
+      // Clear fixed positions on all nodes
+      filteredGraphData.nodes.forEach((node: any) => {
+        node.fx = undefined
+        node.fy = undefined
+        node.fz = undefined
+      })
       fg.d3Force('charge', forceManyBody().strength(-40))
-      fg.d3Force('link', forceLink(graph.links).distance(25).id((d: any) => d.id))
+      fg.d3Force('link', forceLink(filteredGraphData.links).distance(25).id((d: any) => d.id))
       fg.d3Force('center', forceCenter().strength(0.02))
       fg.d3ReheatSimulation()
       fg.refresh()
@@ -445,37 +460,46 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
 
   // --- 4. EFFECTS ---
 
-  // Initial Setup Effect - Run ONCE on Mount
+  // REPAIR: Effect 1 - Core Navigation & Visibility (Must always run)
   useEffect(() => {
     const update = () => { if (containerRef.current) { const r = containerRef.current.getBoundingClientRect(); setContainerSize({ width: r.width, height: r.height }); } }
     update(); window.addEventListener('resize', update);
-    const timer = setTimeout(() => {
-      const fg = fgRef.current; if (!fg) return
+    
+    let retryCount = 0
+    const maxRetries = 50 // 5 seconds
+    
+    const initCamera = setInterval(() => {
+      const fg = fgRef.current
+      if (!fg) {
+        retryCount++
+        if (retryCount > maxRetries) clearInterval(initCamera)
+        return
+      }
       
-      // SETUP 1: Bloom Post-Processing
-      const composer = fg.postProcessingComposer()
-      if (composer && !bloomPassRef.current) {
-        const bloomPass = new UnrealBloomPass(
-          new THREE.Vector2(window.innerWidth, window.innerHeight),
-          0.4, // Initial bloom
-          0.6, // Radius
-          0.2  // Threshold
-        )
-        composer.addPass(bloomPass)
-        bloomPassRef.current = bloomPass
+      // SETUP 1: Camera & Horizon
+      const cam = fg.camera()
+      if (cam) {
+        cam.far = 25000 // Ensure stars aren't clipped
+        cam.updateProjectionMatrix()
+      }
+      
+      if (!cameraInitialized.current) { 
+        // LAZARUS FIX: Use 0.001 to bypass library auto-repositioning
+        fg.cameraPosition({ x: 0.001, y: 0.001, z: 400 })
+        cameraInitialized.current = true 
       }
 
-      // SETUP 2: Controls Enforcement (Once + Continuous)
+      // SETUP 2: Controls Enforcement
       const enforceControls = () => {
         const controls = fg.controls()
         if (controls) {
           controls.autoRotate = false
-          controls.enableDamping = false
-          controls.dampingFactor = 0
+          controls.enableDamping = true // Smooth feel
+          controls.dampingFactor = 0.05
           controls.rotateSpeed = 1.0
           controls.zoomSpeed = 1.2
           controls.minDistance = 50
-          controls.maxDistance = 2200
+          controls.maxDistance = 4400 // Claude's recommended range
           controls.enablePan = true
           controls.screenSpacePanning = true
           controls.mouseButtons = {
@@ -486,22 +510,64 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
         }
       }
       enforceControls()
-      // Re-enforce on every frame to prevent ForceGraph3D from resetting
+      
+      // Clear loop once camera is set
+      clearInterval(initCamera)
+      
+      // Start enforcer for drift prevention
       const controlsEnforcer = setInterval(enforceControls, 500)
       ;(window as any).__controlsEnforcer = controlsEnforcer
 
       if (typeof fg.d3AlphaDecay === 'function') fg.d3AlphaDecay(0.05);
       if (typeof fg.d3VelocityDecay === 'function') fg.d3VelocityDecay(0.3);
-      if (!cameraInitialized.current) { fg.cameraPosition({ x: 0, y: -100, z: 350 }); cameraInitialized.current = true; }
     }, 100)
+
     return () => {
       window.removeEventListener('resize', update)
-      clearTimeout(timer)
-      if ((window as any).__controlsEnforcer) {
-        clearInterval((window as any).__controlsEnforcer)
-      }
+      clearInterval(initCamera)
+      if ((window as any).__controlsEnforcer) clearInterval((window as any).__controlsEnforcer)
     }
-  }, []); 
+  }, []);
+
+  // CAMERA LOCKDOWN: Force camera to viewable position after graphData changes
+  // ForceGraph3D auto-repositions camera based on node count - we override that
+  useEffect(() => {
+    if (!fgRef.current || filteredGraphData.nodes.length === 0) return
+    const timer = setTimeout(() => {
+      const fg = fgRef.current
+      if (!fg) return
+      const cam = fg.camera()
+      if (cam && cam.position.z > 800) {
+        // Library pushed camera too far - bring it back
+        fg.cameraPosition({ x: 0.001, y: 0.001, z: 400 }, { x: 0, y: 0, z: 0 }, 0)
+      }
+    }, 200) // Run after library's onUpdate
+    return () => clearTimeout(timer)
+  }, [filteredGraphData])
+
+  // REPAIR: Effect 2 - Visual Enhancements (Bloom)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const fg = fgRef.current; if (!fg) return
+      const composer = fg.postProcessingComposer()
+      
+      if (composer && !bloomPassRef.current) {
+        try {
+          const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            bloomIntensity, 
+            0.6, 
+            1.0  
+          )
+          // composer.addPass(bloomPass)
+          // bloomPassRef.current = bloomPass
+        } catch (e) {
+          console.error("Atmosphere ignition failed, continuing with standard vision.", e)
+        }
+      }
+    }, 200) // Slight delay after core
+    return () => clearTimeout(timer)
+  }, [bloomIntensity]); 
 
   // Skybox Update Effect (Only when Skybox Changes)
   useEffect(() => {
@@ -526,19 +592,31 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
     }
   }, [localSkybox]);
 
-  // Starfield Creation & Animation Effect (Run Once)
+  // Starfield Creation & Animation Effect (Run Once with Retry)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const fg = fgRef.current; if (!fg) return
-      const scene = fg.scene(); if (!scene) return
+    let retryCount = 0
+    const maxRetries = 50 // 5 seconds max
+    
+    const initStarfield = setInterval(() => {
+      const fg = fgRef.current
+      if (!fg) {
+        retryCount++
+        if (retryCount > maxRetries) clearInterval(initStarfield)
+        return
+      }
+      
+      const scene = fg.scene()
+      if (!scene) return
+
+      clearInterval(initStarfield) // Engine found, stop polling
 
       if (!scene.getObjectByName('starfield-far')) {
           const starTexture = createStarTexture()
           const starColors = [[1.0, 1.0, 1.0], [0.9, 0.95, 1.0], [1.0, 0.95, 0.9], [0.8, 0.9, 1.0], [1.0, 0.98, 0.8], [0.95, 0.9, 1.0]]
           const layers = [
-            { name: 'starfield-far', count: 3000, radius: 1400, size: 1.2, parallax: 0.02 },
-            { name: 'starfield-mid', count: 1200, radius: 900, size: 1.8, parallax: 0.06 },
-            { name: 'starfield-near', count: 400, radius: 500, size: 2.5, parallax: 0.12 },
+            { name: 'starfield-far', count: 10000, radius: 45000, size: 72.0, parallax: 0.02 },
+            { name: 'starfield-mid', count: 5000, radius: 30000, size: 54.0, parallax: 0.06 },
+            { name: 'starfield-near', count: 2000, radius: 15000, size: 36.0, parallax: 0.12 },
           ]
           const allLayerData: Array<{ geo: THREE.BufferGeometry, colors: Float32Array, baseColors: Float32Array, phases: Float32Array, mesh: THREE.Points, parallax: number }> = []
           layers.forEach(layer => {
@@ -607,7 +685,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       }
     }, 100)
     return () => {
-      clearTimeout(timer)
+      clearInterval(initStarfield)
       if (twinkleAnimationRef.current) cancelAnimationFrame(twinkleAnimationRef.current)
     }
   }, []) // Empty deps = run once
@@ -666,7 +744,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
   }, [glowTexture])
 
   const nodeThreeObject = useCallback((node: GraphNode) => {
-    const mat = sharedMaterials[node.category] || sharedMaterials['Unknown']; if (!mat) return new THREE.Object3D()
+    const mat = sharedMaterials[node.category] || sharedMaterials['Unknown']; if (!mat) return new THREE.Object3D() // Ensure mat is not undefined
     const sprite = new THREE.Sprite(mat), baseSize = node.size * 2
     let tScale = 1.0, tOpacity = 1.0, tColor: string | null = null
     const missP = missionProgressRef.current
@@ -676,7 +754,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       switch (activeMission) {
         case 'incident':
           const age = (Date.now()/1000 - (m.mtime || Date.now()/1000))/3600
-          if (age < 24) { tColor = '#ff4d4f'; tScale = 2.2; } else if (age < 168) { tColor = '#ffa940'; tScale = 1.6; }
+          if (age < 24) { tColor = '#ff4d4f'; tScale = 2.2; } else if (age < 168) { tColor = '#ffa940'; tScale = 1.6; } 
           else if ((m.outboundCount || 0) > 8) { tColor = '#ff7875'; tScale = 1.4; } else tOpacity = 0.15
           break
         case 'rot': if (m.isUnused || (m.inboundCount || 0) === 0) { tColor = '#778899'; tScale = 1.5; } else tOpacity = 0.1; break
@@ -703,7 +781,8 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
     if (tColor || curOpacity < 1.0) {
       const cloned = mat.clone()
       if (tColor) cloned.color = new THREE.Color(getCategoryColor(node.category)).lerp(new THREE.Color(tColor), easedP)
-      cloned.opacity = curOpacity; sprite.material = cloned
+      cloned.opacity = curOpacity
+      sprite.material = cloned
     }
     sprite.userData = { nodeId: node.id, baseSize }; return sprite
   }, [sharedMaterials, allFiles, activeMission, isBrokenFile, starSize])
@@ -966,6 +1045,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
           starBrightness={starBrightness} setStarBrightness={setStarBrightness}
           chargeStrength={chargeStrength} setChargeStrength={setChargeStrength}
           skybox={localSkybox} setSkybox={setLocalSkybox}
+          tooltipLevel={tooltipLevel}
         />
 
         {showIntroVideo && (
@@ -1023,6 +1103,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       </div>
       <ForceGraph3D
         ref={fgRef}
+        controlType="orbit"
         width={containerSize.width}
         height={containerSize.height}
         graphData={filteredGraphData}
@@ -1030,7 +1111,6 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
         nodeLabel={() => ''}
         linkColor={() => `rgba(${Math.min(255, 68 + linkOpacity * 90)}, ${Math.min(255, 136 + linkOpacity * 60)}, 255, ${Math.min(1, linkOpacity)})`}
         linkOpacity={linkOpacity}
-        backgroundColor="#000000"
         onNodeClick={handleNodeClick}
         onNodeHover={handleNodeHover}
         enableNavigationControls={true}

@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react'
 import './LoomControlPanel.css'
+import { Tooltip } from './Tooltip'
+import { tooltips, getTooltip, VerbosityLevel } from './TooltipContent'
 
 // Alphabetized families - grid auto-expands for more
 const FAMILIES = [
-  { name: 'Assets', color: '#9370DB' },
-  { name: 'Config', color: '#32CD32' },
-  { name: 'Data', color: '#FF4500' },
-  { name: 'Docs', color: '#86efac' },
-  { name: 'Logic', color: '#00BFFF' },
-  { name: 'UI', color: '#FFD700' },
+  { name: 'Assets', color: '#9370DB', tooltipKey: 'assets' as const },
+  { name: 'Config', color: '#32CD32', tooltipKey: 'config' as const },
+  { name: 'Data', color: '#FF4500', tooltipKey: 'logic' as const },
+  { name: 'Docs', color: '#86efac', tooltipKey: 'assets' as const },
+  { name: 'Logic', color: '#00BFFF', tooltipKey: 'logic' as const },
+  { name: 'UI', color: '#FFD700', tooltipKey: 'components' as const },
 ]
 
 interface Props {
@@ -28,6 +30,7 @@ interface Props {
   setChargeStrength: (val: number) => void
   skybox: string
   setSkybox: (val: string) => void
+  tooltipLevel: VerbosityLevel
 }
 
 export function LoomControlPanel(props: Props) {
@@ -36,6 +39,7 @@ export function LoomControlPanel(props: Props) {
   const [collapsed, setCollapsed] = useState(false)
   const [calibrationOpen, setCalibrationOpen] = useState(true)
   const dragStart = useRef({ x: 0, y: 0 })
+  const level = props.tooltipLevel
 
   useEffect(() => {
     if (!isDragging) return
@@ -78,7 +82,7 @@ export function LoomControlPanel(props: Props) {
       <div className="lcp-body">
         {/* LEGEND */}
         <div className="lcp-section">
-          <div className="lcp-section-title">Legend</div>
+          <div className="lcp-section-title">Galaxy Map</div>
           <div className="lcp-legend-grid">
             {FAMILIES.map(fam => {
               const active = props.soloFamily === fam.name
@@ -86,19 +90,21 @@ export function LoomControlPanel(props: Props) {
                 <div
                   key={fam.name}
                   className={`lcp-legend-item ${active ? 'active' : ''}`}
-                  style={active ? { background: `${fam.color}25`, borderColor: fam.color } : undefined}
+                  style={{ 
+                    background: `${fam.color}15`, // Dimly colored background (15% opacity)
+                    color: active ? '#fff' : 'rgba(255,255,255,0.7)'
+                  }}
+                  onClick={() => props.onSoloFamily(fam.name)}
                 >
-                  <input
-                    type="checkbox"
-                    checked={props.selectedFamilies.includes(fam.name)}
-                    onChange={() => props.onToggleFamily(fam.name)}
-                  />
-                  <button
+                  <div
                     className="lcp-dot"
-                    style={{ background: props.soloFamily && !active ? '#444' : fam.color }}
-                    onClick={() => props.onSoloFamily(fam.name)}
+                    style={{ 
+                      background: fam.color,
+                      color: fam.color, // For box-shadow currentColor
+                      boxShadow: `0 0 10px ${fam.color}` 
+                    }}
                   />
-                  <span style={active ? { color: fam.color } : undefined}>{fam.name}</span>
+                  <span>{fam.name}</span>
                 </div>
               )
             })}
@@ -112,42 +118,54 @@ export function LoomControlPanel(props: Props) {
           </div>
           {calibrationOpen && (
             <div className="lcp-calibration">
-              <div className="lcp-slider">
-                <label>Atmosphere <small>(Bloom)</small></label>
-                <input type="range" min="0" max="2" step="0.05" value={props.bloomIntensity} onChange={e => props.setBloomIntensity(+e.target.value)} />
-                <span>{Math.round(props.bloomIntensity * 100)}%</span>
-              </div>
-              <div className="lcp-slider">
-                <label>Star Mass <small>(Size)</small></label>
-                <input type="range" min="0" max="2" step="0.05" value={props.starSize} onChange={e => props.setStarSize(+e.target.value)} />
-                <span>{Math.round(props.starSize * 100)}%</span>
-              </div>
-              <div className="lcp-slider">
-                <label>Cable Links <small>(Lines)</small></label>
-                <input type="range" min="0" max="2" step="0.05" value={props.linkOpacity} onChange={e => props.setLinkOpacity(+e.target.value)} />
-                <span>{Math.round(props.linkOpacity * 100)}%</span>
-              </div>
-              <div className="lcp-slider">
-                <label>Background <small>(Stars)</small></label>
-                <input type="range" min="0" max="2" step="0.05" value={props.starBrightness} onChange={e => props.setStarBrightness(+e.target.value)} />
-                <span>{Math.round(props.starBrightness * 100)}%</span>
-              </div>
-              <div className="lcp-slider">
-                <label>Spread <small>(Gravity)</small></label>
-                <input type="range" min="-150" max="-5" step="1" value={props.chargeStrength} onChange={e => props.setChargeStrength(+e.target.value)} />
-                <span>{Math.abs(props.chargeStrength)}</span>
-              </div>
-              <div className="lcp-slider">
-                <label>Skybox</label>
-                <select value={props.skybox} onChange={e => props.setSkybox(e.target.value)}>
-                  <option value="none">Deep Space</option>
-                  <option value="nebula">Nebula Purple</option>
-                  <option value="cosmos">Cosmic Blue</option>
-                  <option value="aurora">Aurora Green</option>
-                  <option value="ember">Ember Red</option>
-                  <option value="twilight">Twilight</option>
-                </select>
-              </div>
+              <Tooltip content={getTooltip(tooltips.controls.atmosphere, level)}>
+                <div className="lcp-slider">
+                  <label>Atmosphere <small>(Bloom)</small></label>
+                  <input type="range" min="0" max="2" step="0.05" value={props.bloomIntensity} onChange={e => props.setBloomIntensity(+e.target.value)} />
+                  <span>{Math.round(props.bloomIntensity * 100)}%</span>
+                </div>
+              </Tooltip>
+              <Tooltip content={getTooltip(tooltips.controls.starMass, level)}>
+                <div className="lcp-slider">
+                  <label>Star Mass <small>(Size)</small></label>
+                  <input type="range" min="0" max="2" step="0.05" value={props.starSize} onChange={e => props.setStarSize(+e.target.value)} />
+                  <span>{Math.round(props.starSize * 100)}%</span>
+                </div>
+              </Tooltip>
+              <Tooltip content={getTooltip(tooltips.controls.cableLinks, level)}>
+                <div className="lcp-slider">
+                  <label>Cable Links <small>(Lines)</small></label>
+                  <input type="range" min="0" max="2" step="0.05" value={props.linkOpacity} onChange={e => props.setLinkOpacity(+e.target.value)} />
+                  <span>{Math.round(props.linkOpacity * 100)}%</span>
+                </div>
+              </Tooltip>
+              <Tooltip content={getTooltip(tooltips.controls.background, level)}>
+                <div className="lcp-slider">
+                  <label>Background <small>(Stars)</small></label>
+                  <input type="range" min="0" max="2" step="0.05" value={props.starBrightness} onChange={e => props.setStarBrightness(+e.target.value)} />
+                  <span>{Math.round(props.starBrightness * 100)}%</span>
+                </div>
+              </Tooltip>
+              <Tooltip content={getTooltip(tooltips.controls.spread, level)}>
+                <div className="lcp-slider">
+                  <label>Spread <small>(Gravity)</small></label>
+                  <input type="range" min="-150" max="-5" step="1" value={props.chargeStrength} onChange={e => props.setChargeStrength(+e.target.value)} />
+                  <span>{Math.abs(props.chargeStrength)}</span>
+                </div>
+              </Tooltip>
+              <Tooltip content={getTooltip(tooltips.controls.skybox, level)}>
+                <div className="lcp-slider">
+                  <label>Skybox</label>
+                  <select value={props.skybox} onChange={e => props.setSkybox(e.target.value)}>
+                    <option value="none">Deep Space</option>
+                    <option value="nebula">Nebula Purple</option>
+                    <option value="cosmos">Cosmic Blue</option>
+                    <option value="aurora">Aurora Green</option>
+                    <option value="ember">Ember Red</option>
+                    <option value="twilight">Twilight</option>
+                  </select>
+                </div>
+              </Tooltip>
             </div>
           )}
         </div>

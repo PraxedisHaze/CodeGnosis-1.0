@@ -72,7 +72,8 @@
 .loom-legend,
 .loom-search-input,
 .loom-search-results,
-.loom-control-panel {
+.loom-control-panel,
+.lcp {
   pointer-events: auto; /* Only these specific elements block the graph */
 }
 
@@ -568,5 +569,10 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Force GPU acceleration to kill micro-stutters */
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
 }
 

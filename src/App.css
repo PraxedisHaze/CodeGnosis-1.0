@@ -14,14 +14,60 @@
   min-width: 280px;
   max-width: 280px;
   height: 100%;
-  background: var(--sidebar-bg, linear-gradient(180deg, #111 0%, #0a0a0a 100%));
-  border-right: 1px solid var(--sidebar-border, #333);
+  background: 
+    /* 1. The Void (Dark top fade - dominates upper 40%) */
+    linear-gradient(to bottom, #05030a 0%, rgba(10, 5, 20, 0.8) 40%, transparent 100%),
+    
+    /* 2. Spotlights (Ethereal Beams) */
+    linear-gradient(160deg, transparent 40%, rgba(255, 215, 0, 0.03) 45%, transparent 50%), /* Gold beam left */
+    linear-gradient(200deg, transparent 50%, rgba(138, 43, 226, 0.05) 55%, transparent 60%), /* Purple beam right */
+    radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.02) 0%, transparent 50%), /* Central city haze */
+
+    /* 3. City Glow Base (Deep Maroon/Purple) */
+    linear-gradient(0deg, #2d0b00 0%, #4a0e24 40%, #1a0525 100%);
+  border-right: 1px solid rgba(255, 215, 0, 0.2); /* Gold Trim */
+  box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5); /* Deep Shadow */
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
   z-index: 100;
   overflow: hidden;
   transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.sidebar-header {
+  position: relative;
+}
+
+.header-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-icon,
+.btn-toggle-side {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-icon:hover,
+.btn-toggle-side:hover {
+  background: rgba(100, 180, 255, 0.15);
+  border-color: rgba(100, 180, 255, 0.3);
+  color: #fff;
 }
 
 /* Sidebar on right side */
@@ -57,6 +103,98 @@
   flex-direction: column;
   gap: 1rem;
   margin-top: 2rem;
+}
+
+/* Hero Button (State 1: Select) */
+.btn-hero-large {
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(0, 212, 255, 0.1) !important;
+  border: 1px solid rgba(0, 212, 255, 0.3) !important;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-hero-large:hover {
+  background: rgba(0, 212, 255, 0.2) !important;
+  border-color: rgba(0, 212, 255, 0.6) !important;
+  transform: scale(1.02);
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+.hero-text-top {
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  opacity: 0.8;
+}
+
+.hero-text-bottom {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+/* Analyze Button (State 2: Ignite) */
+.btn-hero-analyze {
+  height: 60px;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  background: rgba(34, 197, 94, 0.15) !important;
+  border: 1px solid rgba(34, 197, 94, 0.4) !important;
+  color: #4ade80 !important;
+}
+
+.btn-hero-analyze:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.25) !important;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  text-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+}
+
+.sidebar-controls-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sidebar-controls-row button {
+  flex: 1;
+  font-size: 0.8rem;
+  padding: 0.5rem;
+}
+
+/* Glass Buttons for Sidebar Scenery Integration */
+.sidebar-controls button {
+  background: rgba(255, 255, 255, 0.03) !important; /* See-through glass */
+  backdrop-filter: blur(4px); /* Frost effect */
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hover: The window lights up */
+.sidebar-controls button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 215, 0, 0.3) !important; /* Gold trim light */
+  color: #fff !important;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Active/Success tints (subtle gradients instead of solid) */
+.sidebar-controls button.btn-primary {
+  border-left: 3px solid rgba(0, 212, 255, 0.5) !important;
+}
+.sidebar-controls button.btn-success {
+  border-left: 3px solid rgba(34, 197, 94, 0.5) !important;
+}
+.sidebar-controls button.btn-secondary {
+  border-left: 3px solid rgba(255, 255, 255, 0.2) !important;
 }
 
 /* Main Content */
@@ -143,6 +281,109 @@
 .empty-state-icon { font-size: 5rem; margin-bottom: 1rem; }
 .empty-state h2 { font-size: 2.5rem; color: #fff; margin-bottom: 1rem; }
 .empty-state p { color: #888; max-width: 500px; }
+
+/* Dart Animation */
+.dart-target-container {
+  position: relative;
+  width: 200px; /* Larger container for better visibility */
+  height: 200px;
+  overflow: visible; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dartboard-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.dartboard-img.dart-hit {
+  animation: boardShudder 0.53s ease-out 0.7s forwards; /* 1/3 faster recoil */
+}
+
+@keyframes boardShudder {
+  0% { transform: scale(1) rotate(0deg); }
+  15% { transform: scale(0.936) rotate(-2deg); } /* 20% softer compression */
+  30% { transform: scale(1.064) rotate(2deg); }  /* 20% softer rebound */
+  50% { transform: scale(0.97) rotate(-1deg); }
+  70% { transform: scale(1.01) rotate(0.5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.dart-img {
+  position: absolute;
+  width: 100%; /* Match board size exactly */
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 10;
+  top: 0;
+  left: 0;
+  transform: translate(0, 0) scale(1) rotate(0deg); 
+  opacity: 0;
+}
+
+.dart-img.dart-landed {
+  opacity: 1;
+  transform: translate(0, 0) scale(1) rotate(0deg);
+}
+
+.dart-img.dart-flying {
+  animation: highResArc 0.7s linear forwards;
+}
+
+/* 
+ * High-Resolution Manual Bezier (10 steps)
+ * Path: 300,300 -> 100,-100 -> 0,0
+ */
+@keyframes highResArc {
+  0% { transform: translate(300px, 300px) scale(3) rotate(90deg); opacity: 0; }
+  10% { transform: translate(260px, 200px) scale(2.8) rotate(80deg); opacity: 1; }
+  20% { transform: translate(220px, 100px) scale(2.6) rotate(70deg); }
+  30% { transform: translate(185px, 20px) scale(2.4) rotate(60deg); }
+  40% { transform: translate(155px, -50px) scale(2.2) rotate(50deg); }
+  50% { transform: translate(130px, -90px) scale(2.0) rotate(40deg); }
+  60% { transform: translate(100px, -110px) scale(1.8) rotate(30deg); } 
+  70% { transform: translate(75px, -100px) scale(1.6) rotate(20deg); }
+  80% { transform: translate(50px, -85px) scale(1.4) rotate(10deg); }
+  90% { transform: translate(25px, -50px) scale(1.2) rotate(5deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* @keyframes flyPath - DELETED */
+
+/* @keyframes manualArc - DELETED */
+
+/* @keyframes flyPath - DELETED */
+
+/* 
+ * Remove old keyframes to clean up
+ */
+/* @keyframes smoothThrow - DELETED */
+
+/* Quiver after landing - Rotational ONLY around the pinned tip */
+.dart-img.dart-quiver {
+  opacity: 1 !important;
+  /* Lock position at 0,0. Only rotate. */
+  transform: translate(0, 0) scale(1) rotate(0deg); 
+  animation: dartVibrate 0.5s ease-out forwards;
+  /* Pivot is exactly center, where the tip is aligned */
+  transform-origin: 50% 50%; 
+}
+
+@keyframes dartVibrate {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(-6deg); } /* Tighter flex left */
+  20% { transform: rotate(5deg); }  /* Tighter flex right */
+  30% { transform: rotate(-4deg); }
+  40% { transform: rotate(3deg); }
+  50% { transform: rotate(-2deg); }
+  60% { transform: rotate(1deg); }
+  100% { transform: rotate(0deg); }
+}
 
 /* Global Buttons */
 .btn {
@@ -325,4 +566,41 @@
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
   padding: 2rem;
   overflow-y: auto;
+}
+
+/* Startup Video Overlay */
+.startup-video-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.3s ease-out;
+}
+
+.startup-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Analysis Video Overlay - plays during analysis */
+.analysis-video-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.5s ease-out;
+}
+
+.analysis-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
