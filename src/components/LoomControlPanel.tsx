@@ -30,11 +30,13 @@ interface Props {
   setChargeStrength: (val: number) => void
   skybox: string
   setSkybox: (val: string) => void
+  useShapes: boolean
+  setUseShapes: (val: boolean) => void
   tooltipLevel: VerbosityLevel
 }
 
 export function LoomControlPanel(props: Props) {
-  const [pos, setPos] = useState({ x: 16, y: 70 })
+  const [pos, setPos] = useState({ x: 16, y: 24 })
   const [isDragging, setIsDragging] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [calibrationOpen, setCalibrationOpen] = useState(true)
@@ -44,10 +46,10 @@ export function LoomControlPanel(props: Props) {
   useEffect(() => {
     if (!isDragging) return
     const onMove = (e: MouseEvent) => {
-      setPos({
-        x: Math.max(0, e.clientX - dragStart.current.x),
-        y: Math.max(0, e.clientY - dragStart.current.y)
-      })
+      // Clamp position so the 'Controls' box can't leave the viewport
+      const newX = Math.max(0, Math.min(window.innerWidth - 340, e.clientX - dragStart.current.x))
+      const newY = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - dragStart.current.y))
+      setPos({ x: newX, y: newY })
     }
     const onUp = () => setIsDragging(false)
     window.addEventListener('mousemove', onMove)
@@ -118,42 +120,70 @@ export function LoomControlPanel(props: Props) {
           </div>
           {calibrationOpen && (
             <div className="lcp-calibration">
-              <Tooltip content={getTooltip(tooltips.controls.atmosphere, level)}>
+              <Tooltip content={getTooltip(tooltips.controls.atmosphere, level)} anchored>
                 <div className="lcp-slider">
                   <label>Atmosphere <small>(Bloom)</small></label>
                   <input type="range" min="0" max="2" step="0.05" value={props.bloomIntensity} onChange={e => props.setBloomIntensity(+e.target.value)} />
                   <span>{Math.round(props.bloomIntensity * 100)}%</span>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.controls.starMass, level)}>
+              <Tooltip content={getTooltip(tooltips.controls.starMass, level)} anchored>
                 <div className="lcp-slider">
                   <label>Star Mass <small>(Size)</small></label>
                   <input type="range" min="0" max="2" step="0.05" value={props.starSize} onChange={e => props.setStarSize(+e.target.value)} />
                   <span>{Math.round(props.starSize * 100)}%</span>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.controls.cableLinks, level)}>
+              <Tooltip content={getTooltip(tooltips.controls.cableLinks, level)} anchored>
                 <div className="lcp-slider">
                   <label>Cable Links <small>(Lines)</small></label>
                   <input type="range" min="0" max="2" step="0.05" value={props.linkOpacity} onChange={e => props.setLinkOpacity(+e.target.value)} />
                   <span>{Math.round(props.linkOpacity * 100)}%</span>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.controls.background, level)}>
+              <Tooltip content={getTooltip(tooltips.controls.background, level)} anchored>
                 <div className="lcp-slider">
                   <label>Background <small>(Stars)</small></label>
                   <input type="range" min="0" max="2" step="0.05" value={props.starBrightness} onChange={e => props.setStarBrightness(+e.target.value)} />
                   <span>{Math.round(props.starBrightness * 100)}%</span>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.controls.spread, level)}>
+              <Tooltip content={getTooltip(tooltips.controls.spread, level)} anchored>
                 <div className="lcp-slider">
                   <label>Spread <small>(Gravity)</small></label>
-                  <input type="range" min="-150" max="-5" step="1" value={props.chargeStrength} onChange={e => props.setChargeStrength(+e.target.value)} />
-                  <span>{Math.abs(props.chargeStrength)}</span>
+                  <div className="lcp-segmented-control">
+                    <button 
+                      className={props.chargeStrength > -30 ? 'active' : ''} 
+                      onClick={() => props.setChargeStrength(-10)}
+                      title="Compact View"
+                    >
+                      Tight
+                    </button>
+                    <button 
+                      className={props.chargeStrength <= -30 && props.chargeStrength > -100 ? 'active' : ''} 
+                      onClick={() => props.setChargeStrength(-60)}
+                      title="Standard View"
+                    >
+                      Norm
+                    </button>
+                    <button 
+                      className={props.chargeStrength <= -100 ? 'active' : ''} 
+                      onClick={() => props.setChargeStrength(-300)}
+                      title="Expanded View"
+                    >
+                      Wide
+                    </button>
+                  </div>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.controls.skybox, level)}>
+              <div className="lcp-slider">
+                <label>Node Style</label>
+                <div className="lcp-segmented-control">
+                  <button className={!props.useShapes ? 'active' : ''} onClick={() => props.setUseShapes(false)}>Stars</button>
+                  <button className={props.useShapes ? 'active' : ''} onClick={() => props.setUseShapes(true)}>Shapes</button>
+                </div>
+              </div>
+              <Tooltip content={getTooltip(tooltips.controls.skybox, level)} anchored>
                 <div className="lcp-slider">
                   <label>Skybox</label>
                   <select value={props.skybox} onChange={e => props.setSkybox(e.target.value)}>

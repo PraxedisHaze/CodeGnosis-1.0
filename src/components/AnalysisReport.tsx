@@ -12,6 +12,7 @@ interface AnalysisReportProps {
   onOpenFolder: () => void
   onCopyPath: () => void
   onFileClick?: (file: string) => void
+  onViewVault?: (articleId: string) => void
 }
 
 // Severity color mapping
@@ -60,7 +61,7 @@ const MIN_PADDING = 16 // 1rem
 const MAX_PADDING = 32 // 2rem - comfortable breathing room
 const TOP_OFFSET = 48 // Clear the tab buttons
 
-export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, onFileClick }: AnalysisReportProps) {
+export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, onFileClick, onViewVault }: AnalysisReportProps) {
   const [expandedSection, setExpandedSection] = useState<string | null>('overview')
   const containerRef = useRef<HTMLDivElement>(null)
   const [dynamicPadding, setDynamicPadding] = useState(MIN_PADDING)
@@ -155,7 +156,11 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
           )}
         </div>
         <div className="hero-right">
-          <Tooltip content="Overall project health score (0-100). Based on circular dependencies, orphaned files, broken references, and code structure. Higher is better - aim for 80+.">
+          <Tooltip 
+            content="Overall project health score (0-100). Based on circular dependencies, orphaned files, broken references, and code structure. Higher is better - aim for 80+."
+            articleId="concept-health"
+            onViewVault={onViewVault}
+          >
             <div
               className="health-ring"
               style={{
@@ -411,7 +416,11 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
         )}
 
         {/* Critical Path - Hub Files */}
-        <Tooltip content="These are the most important files in your project - many other files depend on them. Changes here affect everything. Handle with extra care and testing.">
+        <Tooltip 
+          content="These are the most important files in your project - many other files depend on them. Changes here affect everything. Handle with extra care and testing."
+          articleId="concept-hub-files"
+          onViewVault={onViewVault}
+        >
         <section className="intel-panel hubs-panel">
           <h3 onClick={() => toggleSection('hubs')}>
             Critical Path (Hub Files)
@@ -500,7 +509,11 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
 
         {/* Circular Dependencies Detail */}
         {cycles.length > 0 && (
-          <Tooltip content="File A needs B, B needs C, C needs A - an infinite loop! These cause bugs, slow builds, and confuse AI tools. Breaking these cycles should be a priority.">
+          <Tooltip 
+            content="File A needs B, B needs C, C needs A - an infinite loop! These cause bugs, slow builds, and confuse AI tools. Breaking these cycles should be a priority."
+            articleId="concept-circular"
+            onViewVault={onViewVault}
+          >
           <section className="intel-panel cycles-panel">
             <h3 onClick={() => toggleSection('cycles')}>
               Circular Dependencies

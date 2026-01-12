@@ -7,143 +7,46 @@
     html, body {
       width: 100%;
       height: 100%;
-      background: #000;
+      background: transparent;
       overflow: hidden;
-      font-family: 'Courier New', Courier, monospace;
-      color: rgba(100, 255, 100, 0.7);
-      user-select: none;
-      cursor: wait;
+      font-family: system-ui, -apple-system, sans-serif;
     }
-
-    .container {
-      position: relative;
+    .splash-container {
       width: 100%;
       height: 100%;
-      background: radial-gradient(circle at 50% 50%, #0a0a12 0%, #000 90%);
+      background: rgba(0, 0, 0, 0.95);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      border: 1px solid rgba(100, 180, 255, 0.3);
+      box-shadow: 0 0 40px rgba(100, 180, 255, 0.2);
     }
-
-    /* Random Snippets */
-    .snippet {
-      position: absolute;
-      font-size: 0.8rem;
-      opacity: 0;
-      white-space: nowrap;
-      pointer-events: none;
+    .title {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      color: #fff;
+      text-shadow: 0 0 20px rgba(100, 180, 255, 0.8);
     }
-
-    /* The Emblem (é) - Subtle, bright, smaller */
-    .emblem {
-      color: #fff; /* Pure white */
-      text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
-      font-size: 0.7rem; /* Smaller than snippet */
-      font-weight: bold;
+    .loading {
+      font-size: 0.85rem;
+      letter-spacing: 0.4em;
+      color: rgba(150, 200, 255, 0.7);
+      animation: pulse 1.5s ease-in-out infinite;
     }
-
-    @keyframes fadeInOut {
-      0% { opacity: 0; transform: translateY(5px); }
-      20% { opacity: 0.6; transform: translateY(0); }
-      80% { opacity: 0.6; transform: translateY(0); }
-      100% { opacity: 0; transform: translateY(-5px); }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
     }
-
-    @keyframes typeDelete {
-      0% { width: 0; opacity: 1; border-right: 2px solid transparent; }
-      10% { opacity: 1; border-right: 2px solid #fff; }
-      50% { width: 100%; opacity: 1; border-right: 2px solid #fff; }
-      80% { opacity: 1; border-right: 2px solid transparent; }
-      100% { width: 100%; opacity: 0; }
-    }
-
-    .typing-line {
-      overflow: hidden;
-      border-right: 2px solid transparent;
-      display: inline-block;
-      white-space: nowrap;
-      color: rgba(100, 180, 255, 0.6);
-      font-size: 0.75rem;
-    }
-
   </style>
 </head>
 <body>
-  <div class="container" id="void"></div>
-
-  <script>
-    const container = document.getElementById('void');
-    const snippets = [
-      "void main() {", "import * as _", "0x4F 0x92 0x1A", 
-      "struct Ghost {", "impl Witness for Self", 
-      "System.out.println", "await fetch('/truth')",
-      "01001101", "00101010", "const signal = true",
-      "fn pulse() -> Result", "class Shadow extends",
-      "if (seen) break;", "while(true) listen()",
-      "// do not remove", "/* legacy */"
-    ];
-
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    function createSnippet() {
-      const el = document.createElement('div');
-      el.className = 'snippet';
-      
-      // Random content: 15% chance of being the Emblem
-      if (Math.random() < 0.15) {
-        el.innerHTML = "(<span class='emblem'>é</span>)";
-        // Emblems prefer corners
-        const corner = Math.floor(Math.random() * 4);
-        const padding = 60;
-        let x, y;
-        switch(corner) {
-            case 0: x = Math.random() * 200; y = Math.random() * 200; break; // TL
-            case 1: x = width - Math.random() * 200; y = Math.random() * 200; break; // TR
-            case 2: x = Math.random() * 200; y = height - Math.random() * 200; break; // BL
-            case 3: x = width - Math.random() * 200; y = height - Math.random() * 200; break; // BR
-        }
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
-        el.style.animation = `fadeInOut ${2 + Math.random() * 3}s ease-in-out forwards`;
-      } else {
-        el.innerText = snippets[Math.floor(Math.random() * snippets.length)];
-        el.style.left = (Math.random() * (width - 100)) + 'px';
-        el.style.top = (Math.random() * (height - 20)) + 'px';
-        el.style.color = `rgba(${100 + Math.random()*100}, ${100 + Math.random()*155}, ${200 + Math.random()*55}, ${0.3 + Math.random() * 0.4})`;
-        el.style.fontSize = (0.6 + Math.random() * 0.4) + 'rem';
-        el.style.animation = `fadeInOut ${1 + Math.random() * 4}s ease-in-out forwards`;
-      }
-
-      container.appendChild(el);
-
-      // Self-cleanup
-      setTimeout(() => el.remove(), 5000);
-    }
-
-    function createTyper() {
-      const el = document.createElement('div');
-      el.className = 'snippet typing-line';
-      const text = snippets[Math.floor(Math.random() * snippets.length)];
-      el.innerText = text;
-      
-      // Random position
-      el.style.left = (Math.random() * (width - 200)) + 'px';
-      el.style.top = (Math.random() * (height - 20)) + 'px';
-      
-      // Typing animation
-      const duration = 2 + Math.random() * 2;
-      el.style.width = '0';
-      el.style.animation = `typeDelete ${duration}s steps(${text.length}, end) forwards`;
-      
-      container.appendChild(el);
-      setTimeout(() => el.remove(), duration * 1000);
-    }
-
-    // Chaos Engine
-    setInterval(createSnippet, 150); // High frequency pop-in
-    setInterval(createTyper, 800);   // Slower typing events
-
-    // Initial burst
-    for(let i=0; i<15; i++) createSnippet();
-
-  </script>
+  <div class="splash-container">
+    <div class="title">CODEGNOSIS</div>
+    <div class="loading">LOADING</div>
+  </div>
 </body>
 </html>

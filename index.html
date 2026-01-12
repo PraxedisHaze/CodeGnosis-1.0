@@ -234,6 +234,24 @@
         50% { opacity: 1; }
       }
 
+      #flash-e {
+        position: fixed;
+        bottom: 2rem;
+        left: 2rem;
+        font-size: 1.5rem;
+        color: #fff;
+        opacity: 0;
+        z-index: 3;
+        animation: flashE 4s linear forwards;
+      }
+      @keyframes flashE {
+        0%, 48% { opacity: 0; }
+        50%, 52% { opacity: 1; }
+        54%, 74% { opacity: 0; }
+        75%, 76% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+
       #launch-btn {
         display: none;
         font-size: 1.1rem;
@@ -300,6 +318,7 @@
         <div id="splash-loading">LOADING</div>
         <button id="launch-btn" onclick="launchVideo()">TAKE FLIGHT</button>
       </div>
+      <div id="flash-e">(&eacute;)</div>
     </div>
 
     <div id="root"></div>

@@ -164,14 +164,19 @@
   padding: 0.5rem;
 }
 
+.sidebar-section {
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+
 /* Glass Buttons for Sidebar Scenery Integration */
 .sidebar-controls button {
   background: rgba(255, 255, 255, 0.03) !important; /* See-through glass */
   backdrop-filter: blur(4px); /* Frost effect */
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: rgba(255, 255, 255, 0.8) !important;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 212, 255, 0.5) !important; /* Neon Blue Border Base */
+  color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 0 5px rgba(0, 212, 255, 0.2); /* Subtle base glow */
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Snappy mechanical feel */
   text-shadow: 0 2px 4px rgba(0,0,0,0.8);
   position: relative;
   overflow: hidden;
@@ -180,10 +185,18 @@
 /* Hover: The window lights up */
 .sidebar-controls button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1) !important;
-  border-color: rgba(255, 215, 0, 0.3) !important; /* Gold trim light */
+  border-color: #00d4ff !important; /* Bright Neon Blue */
   color: #fff !important;
-  box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
-  transform: translateY(-1px);
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.6), inset 0 0 10px rgba(0, 212, 255, 0.2); /* Intense Neon Pop */
+  transform: translateY(-2px) scale(1.02); /* Levitate slightly */
+  z-index: 10;
+}
+
+/* Active: Pseudo-Haptic Press (Resistance) */
+.sidebar-controls button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98); /* Press into the glass */
+  box-shadow: 0 0 5px rgba(0, 212, 255, 0.4); /* Glow compresses */
+  transition: transform 0.05s ease-out; /* Instant feedback */
 }
 
 /* Active/Success tints (subtle gradients instead of solid) */
@@ -566,6 +579,17 @@
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
   padding: 2rem;
   overflow-y: auto;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 4rem; /* Force a massive gap from any buttons above */
+  padding-bottom: 1rem;
+  opacity: 0.3;
+  font-size: 0.75rem;
+  text-align: center;
+  color: #fff;
+  letter-spacing: 1px;
 }
 
 /* Startup Video Overlay */

@@ -25,7 +25,8 @@
     "react-dom": "^18.3.1",
     "react-force-graph-3d": "^1.29.0",
     "reactflow": "^11.11.4",
-    "three": "^0.182.0"
+    "three": "^0.182.0",
+    "three-spritetext": "^1.10.0"
   },
   "devDependencies": {
     "@tauri-apps/api": "^2.1.1",

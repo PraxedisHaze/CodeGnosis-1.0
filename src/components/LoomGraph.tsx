@@ -9,6 +9,7 @@
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
 import * as THREE from 'three'
+import SpriteText from 'three-spritetext'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { forceManyBody, forceLink, forceCenter } from 'd3-force-3d'
 import { LoomControlPanel } from './LoomControlPanel'
@@ -29,6 +30,7 @@ interface LoomGraphProps {
   tooltipLevel?: VerbosityLevel
   onNodeClick?: (file: string) => void
   onIntroComplete?: () => void
+  onMissionChange?: (mission: string | null) => void
 }
 
 // Skybox gradient definitions
@@ -60,8 +62,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 
 const CATEGORY_FAMILIES: Record<string, string> = {
-  'TypeScript': 'Logic', 'TypeScript React': 'Logic', 'JavaScript': 'Logic', 'React': 'Logic', 'Rust': 'Logic', 'Python': 'Logic',
-  'CSS': 'UI', 'SCSS': 'UI', 'HTML': 'UI', 'JSON': 'Data', 'YAML': 'Data', 'TOML': 'Data', 'SQL': 'Data',
+  'TypeScript': 'Logic', 'TypeScript React': 'Logic', 'JavaScript': 'Logic', 'JavaScript Module': 'Logic', 'React': 'Logic', 'Rust': 'Logic', 'Python': 'Logic', 'TypeScript Module': 'Logic',
+  'CSS': 'UI', 'SCSS': 'UI', 'HTML': 'UI', 'JSON': 'Data', 'YAML': 'Data', 'TOML': 'Data', 'SQL': 'Data', 'XML': 'Data',
   'Config': 'Config', 'ENV': 'Config', 'INI': 'Config', 'Image': 'Assets', 'Font': 'Assets', 'Video': 'Assets', 'Audio': 'Assets',
   'Markdown': 'Docs', 'Text': 'Docs', 'External': 'External'
 }
@@ -71,21 +73,27 @@ function getCategoryFamily(category: string): string { return CATEGORY_FAMILIES[
 function getCategoryColor(category: string): string {
   if (CATEGORY_COLORS[category]) return CATEGORY_COLORS[category]
   const fam = getCategoryFamily(category)
-  const famColors: Record<string, string> = { 'Logic': '#00BFFF', 'UI': '#FFD700', 'Data': '#FF4500', 'Config': '#32CD32', 'Assets': '#9370DB', 'Docs': '#86efac', 'Unknown': '#a1a1aa', 'External': '#ff00ff' }
-  return famColors[fam] || '#a1a1aa'
+  const famColors: Record<string, string> = { 'Logic': '#00BFFF', 'UI': '#FFD700', 'Data': '#FF6633', 'Config': '#32CD32', 'Assets': '#B794F6', 'Docs': '#A8F5C8', 'Unknown': '#D4D4DC', 'External': '#ff00ff' }
+  return famColors[fam] || '#D4D4DC'
 }
 
 function createGlowTexture(): THREE.Texture {
   const size = 256, canvas = document.createElement('canvas')
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d')!, center = size / 2, glow = size / 2
-  const grad = ctx.createRadialGradient(center, center, 0, center, center, glow)
-  // Solid core with sharp falloff - fixes ghostly appearance on blue/cyan stars
+  
+  // Solid Core (25% radius)
+  ctx.beginPath();
+  ctx.arc(center, center, size * 0.125, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
+  ctx.fill();
+
+  const grad = ctx.createRadialGradient(center, center, size * 0.125, center, center, glow)
+  // Glow gradient starting from edge of solid core
   grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)')
-  grad.addColorStop(0.15, 'rgba(255, 255, 255, 1.0)')
-  grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.8)')
+  grad.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)')
   grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.4)')
-  grad.addColorStop(0.7, 'rgba(255, 255, 255, 0.15)')
+  grad.addColorStop(0.8, 'rgba(255, 255, 255, 0.15)')
   grad.addColorStop(1, 'rgba(255, 255, 255, 0)')
   ctx.fillStyle = grad; ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas); tex.needsUpdate = true; return tex
@@ -124,11 +132,10 @@ function getSectorPosition(cat: string, idx: number, total: number, path: string
   return { x: Math.cos(angle) * len, y: (Math.sin(seed+1)*10000 - Math.floor(Math.sin(seed+1)*10000) - 0.5) * 30 * scale, z: Math.sin(angle) * len }
 }
 
-function calculateFormationPosition(filePath: string, category: string, allFilePaths: string[], fileTypesMap: Record<string, string>): { x: number, y: number, z: number } {
-  const spacingScale = 1.0
+function calculateFormationPosition(filePath: string, category: string, allFilePaths: string[], fileTypesMap: Record<string, string>, spacingScale: number = 1.0): { x: number, y: number, z: number } {
   const family = getCategoryFamily(category)
   const typeOffsets: Record<string, number> = { 'Logic': -150, 'UI': -75, 'Data': 0, 'Config': 75, 'Assets': 150, 'Docs': 225, 'Unknown': 300, 'External': 375 }
-  const x = typeOffsets[family] ?? 300
+  const x = (typeOffsets[family] ?? 300) * spacingScale
   const pathParts = filePath.replace(/\//g, '\\').split('\\')
   const depth = pathParts.length - 1
   const y = depth * 30
@@ -136,7 +143,7 @@ function calculateFormationPosition(filePath: string, category: string, allFileP
   const idx = sameTypeFiles.indexOf(filePath)
   const gridCols = 6, row = Math.floor(idx / gridCols), col = idx % gridCols
   const z = (row * 20 - 60) * spacingScale
-  return { x: x + (col - 2.5) * 12, y: y, z: z }
+  return { x: x + (col - 2.5) * 12 * spacingScale, y: y, z: z }
 }
 
 function createSkyboxTexture(topColor: string, bottomColor: string, horizonColor: string, isTop: boolean, isSide: boolean): THREE.CanvasTexture {
@@ -171,7 +178,7 @@ function createSkyboxTexture(topColor: string, bottomColor: string, horizonColor
   return texture
 }
 
-export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, brokenReferences, activeMission, skipIntroAnimation, twinkleIntensity = 0.5, starBrightness: initialStarBrightness = 1.0, skybox = 'none', tooltipLevel = 'professional', onNodeClick, onIntroComplete }: LoomGraphProps) {
+export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, brokenReferences, activeMission, skipIntroAnimation, twinkleIntensity = 0.5, starBrightness: initialStarBrightness = 1.0, skybox = 'none', tooltipLevel = 'professional', onNodeClick, onIntroComplete, onMissionChange }: LoomGraphProps) {
   // --- 1. STATE & REFS ---
   const fgRef = useRef<any>()
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
@@ -305,13 +312,8 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
 
   const filteredGraphData = useMemo(() => {
     const { nodes, links } = graphData
-    if (!soloFamily && !selectedNode && selectedFamilies.length === 0 && !activeMission) return graphData
+    if (!selectedNode && selectedFamilies.length === 0 && !activeMission && !isFormationMode) return graphData
     let filtered = [...nodes]
-
-    // Solo family filter (highest priority after selected node)
-    if (soloFamily) {
-      filtered = filtered.filter(n => getCategoryFamily(n.category) === soloFamily)
-    }
 
     // Selected node - show only connected
     if (selectedNode) {
@@ -338,6 +340,29 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       filtered = filtered.filter(n => getCategoryFamily(n.category) !== 'External')
     }
 
+    // Inject Labels for Formation Mode
+    if (isFormationMode) {
+      const families = ['Logic', 'UI', 'Data', 'Config', 'Assets', 'Docs', 'External'];
+      const typeOffsets: Record<string, number> = { 'Logic': -150, 'UI': -75, 'Data': 0, 'Config': 75, 'Assets': 150, 'Docs': 225, 'External': 375 }
+      
+      families.forEach(fam => {
+        const x = typeOffsets[fam] ?? 300
+        // Add a virtual node for the label
+        filtered.push({
+          id: `__LABEL_${fam}`,
+          category: 'Label',
+          group: 99,
+          size: 0,
+          x: x,
+          y: 400, // High above the stack
+          z: 0,
+          fx: x,
+          fy: 400,
+          fz: 0
+        } as any)
+      })
+    }
+
     const ids = new Set(filtered.map(n => n.id))
     if (filtered.length === 0 && nodes.length > 0) return { nodes, links }
     const filteredLinks = links.filter(l => {
@@ -346,7 +371,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       return ids.has(sId) && ids.has(tId)
     })
     return { nodes: filtered, links: filteredLinks }
-  }, [graphData, selectedNode, soloFamily, selectedFamilies, showExternal, dependencyGraph, activeMission, allFiles])
+  }, [graphData, selectedNode, selectedFamilies, showExternal, dependencyGraph, activeMission, allFiles, isFormationMode])
 
   // --- 3. HELPERS (HOISTED) ---
   const isBrokenFile = useCallback((id: string) => {
@@ -356,6 +381,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
 
   const resetToGodView = useCallback(() => {
     setIsExploding(false)
+    setChargeStrength(-40)
     if (fgRef.current) {
       const c = fgRef.current.controls();
       if (c) {
@@ -375,6 +401,25 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
           800
         )
       }
+    }
+  }, [fgRef])
+
+  const resetCamera = useCallback(() => {
+    setIsExploding(false)
+    if (fgRef.current) {
+      const c = fgRef.current.controls();
+      if (c) {
+        c.enabled = true
+        c.autoRotate = false
+        c.enableDamping = false
+        c.update()
+      }
+      // Reset View: teleport camera back to home position and look at center
+      fgRef.current.cameraPosition(
+        { x: 0.001, y: 0.001, z: 400 },
+        { x: 0, y: 0, z: 0 },
+        1200
+      )
     }
   }, [fgRef])
 
@@ -406,9 +451,19 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       const graphNodes = filteredGraphData.nodes
       const allFilePaths = graphNodes.map((n: GraphNode) => n.id)  
       const targets: Record<string, {x: number, y: number, z: number}> = {}
+      
+      const spacingMultiplier = Math.abs(chargeStrength) / 40;
+
       graphNodes.forEach((node: GraphNode) => {
+        if (node.category === 'Label') {
+           const fam = node.id.replace('__LABEL_', '');
+           const typeOffsets: Record<string, number> = { 'Logic': -150, 'UI': -75, 'Data': 0, 'Config': 75, 'Assets': 150, 'Docs': 225, 'External': 375 };
+           const lx = (typeOffsets[fam] ?? 300) * spacingMultiplier;
+           targets[node.id] = { x: lx, y: 400, z: 0 };
+           return;
+        }
         const category = node.category || 'Unknown'
-        const baseTarget = calculateFormationPosition(node.id, category, allFilePaths, fileTypes)
+        const baseTarget = calculateFormationPosition(node.id, category, allFilePaths, fileTypes, spacingMultiplier)
         const lift = isBrokenFile(node.id) ? 120 : 0
         targets[node.id] = { x: baseTarget.x, y: baseTarget.y + lift, z: baseTarget.z }
       })
@@ -446,13 +501,14 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       const fg = fgRef.current
       // Clear fixed positions on all nodes
       filteredGraphData.nodes.forEach((node: any) => {
-        node.fx = undefined
-        node.fy = undefined
-        node.fz = undefined
+        node.fx = null
+        node.fy = null
+        node.fz = null
       })
       fg.d3Force('charge', forceManyBody().strength(-40))
       fg.d3Force('link', forceLink(filteredGraphData.links).distance(25).id((d: any) => d.id))
       fg.d3Force('center', forceCenter().strength(0.02))
+      // fg.d3Alpha(1) // Removed: Not exposed by ref, causes crash
       fg.d3ReheatSimulation()
       fg.refresh()
     }
@@ -701,7 +757,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       if (p < 1) requestAnimationFrame(animateMiss)
     }
     requestAnimationFrame(animateMiss)
-  }, [activeMission, isExploding, isFormationMode, toggleFormationMode])
+  }, [activeMission, soloFamily, isExploding, isFormationMode, toggleFormationMode])
 
   useEffect(() => {
     if (bloomPassRef.current) {
@@ -716,13 +772,45 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
     }
   }, [starSize])
 
-  // Update charge force when slider changes
+  // Update charge force when slider changes (Galaxy) OR Tightness (Formation)
+  useEffect(() => {
+    if (!fgRef.current) return;
+    if (isFormationMode) {
+      // Live Tightness Update
+      const spacingMultiplier = Math.abs(chargeStrength) / 40;
+      const graphNodes = filteredGraphData.nodes;
+      const allFilePaths = graphNodes.map((n: GraphNode) => n.id);
+      
+      graphNodes.forEach((node: any) => {
+        if (node.category === 'Label') {
+           const fam = node.id.replace('__LABEL_', '');
+           const typeOffsets: Record<string, number> = { 'Logic': -150, 'UI': -75, 'Data': 0, 'Config': 75, 'Assets': 150, 'Docs': 225, 'External': 375 };
+           node.fx = (typeOffsets[fam] ?? 300) * spacingMultiplier;
+           node.x = node.fx;
+           return;
+        }
+        const pos = calculateFormationPosition(node.id, node.category || 'Unknown', allFilePaths, fileTypes, spacingMultiplier);
+        const lift = isBrokenFile(node.id) ? 120 : 0;
+        node.fx = pos.x;
+        node.fy = pos.y + lift;
+        node.fz = pos.z;
+        node.x = node.fx; node.y = node.fy; node.z = node.fz;
+      });
+      fgRef.current.refresh();
+    } else {
+      fgRef.current.d3Force('charge', forceManyBody().strength(chargeStrength))
+      fgRef.current.d3ReheatSimulation()
+    }
+  }, [chargeStrength, isFormationMode])
+
+  /*
   useEffect(() => {
     if (fgRef.current && !isFormationMode) {
       fgRef.current.d3Force('charge', forceManyBody().strength(chargeStrength))
       fgRef.current.d3ReheatSimulation()
     }
   }, [chargeStrength, isFormationMode])
+  */
 
   // --- 5. RENDER HELPERS ---
   const getProminentTrait = useCallback((id: string): ProminentTrait => {
@@ -744,22 +832,46 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
   }, [glowTexture])
 
   const nodeThreeObject = useCallback((node: GraphNode) => {
+    // Handle Label Nodes
+    if (node.category === 'Label') {
+      const sprite = new SpriteText(node.id.replace('__LABEL_', ''));
+      sprite.color = '#ffffff';
+      sprite.textHeight = 24;
+      sprite.fontFace = 'Courier New';
+      sprite.fontWeight = 'bold';
+      sprite.backgroundColor = 'rgba(0,0,0,0.5)';
+      sprite.padding = 4;
+      return sprite;
+    }
+
     const mat = sharedMaterials[node.category] || sharedMaterials['Unknown']; if (!mat) return new THREE.Object3D() // Ensure mat is not undefined
     const sprite = new THREE.Sprite(mat), baseSize = node.size * 2
     let tScale = 1.0, tOpacity = 1.0, tColor: string | null = null
     const missP = missionProgressRef.current
-    // Video intro handles visibility via overlay - stars render normally behind it
-    if (activeMission) {
-      const m = allFiles[node.id] || {}, fam = getCategoryFamily(node.category)
+    
+    const nodeFamily = getCategoryFamily(node.category)
+
+    // PRIORITY 1: Solo Family Highlight (Legend) - Soft Filter
+    if (soloFamily) {
+      if (nodeFamily === soloFamily) {
+        tScale = 1.4;
+        tColor = '#ffffff'; // Radiant white highlight for selected family
+      } else {
+        tOpacity = 0.1; // Context dimming
+      }
+    } 
+    // PRIORITY 2: Active Mission Logic (only if no Legend solo)
+    else if (activeMission) {
+      const m = allFiles[node.id] || {}, fam = nodeFamily
       switch (activeMission) {
         case 'incident':
           const age = (Date.now()/1000 - (m.mtime || Date.now()/1000))/3600
-          if (age < 24) { tColor = '#ff4d4f'; tScale = 2.2; } else if (age < 168) { tColor = '#ffa940'; tScale = 1.6; } 
+          if (age < 24) { tColor = '#ff4d4f'; tScale = 2.2; } else if (age < 168) { tColor = '#ffa940'; tScale = 1.6; }
           else if ((m.outboundCount || 0) > 8) { tColor = '#ff7875'; tScale = 1.4; } else tOpacity = 0.15
           break
         case 'rot': if (m.isUnused || (m.inboundCount || 0) === 0) { tColor = '#778899'; tScale = 1.5; } else tOpacity = 0.1; break
         case 'onboard': if (m.isEntryPoint || (m.inboundCount || 0) === 0) { tColor = '#FFD700'; tScale = 3.0; } else tOpacity = 0.2; break
-        case 'risk': if ((m.inboundCount || 0) > 8 || (m.cycleParticipation || 0) > 0) { tColor = '#DC143C'; tScale = 1.8; } else tOpacity = 0.2; break
+        case 'risk': if ((m.inboundCount || 0) > 8 || (m.cycleParticipation || 0) > 0) { tColor = '#DC143C'; tScale = 1.4; } else tOpacity = 0.2; break
         case 'optimize': 
           // Highlight Assets and Deep dependency chains
           const chainDepth = m.chainDepth || 0;
@@ -776,7 +888,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
     const curScale = 1.0 + (tScale - 1.0) * easedP, curOpacity = Math.max(0.0001, 1.0 + (tOpacity - 1.0) * easedP)
     const pulse = (tScale > 1.0 && easedP === 1.0) ? (1.0 + Math.sin(Date.now() / 300) * 0.05) : 1.0
     // ENFORCE MINIMUM SIZE: 2.0 to ensure visibility even if starSize is low
-    const finalS = Math.max(2.0, baseSize * starSize * (isBrokenFile(node.id) ? 1.6 : 1) * curScale * pulse)
+    const finalS = Math.max(2.0, baseSize * starSize * (isBrokenFile(node.id) ? 1.4 : 1) * curScale * pulse)
     sprite.scale.set(finalS, finalS, 1)
     if (tColor || curOpacity < 1.0) {
       const cloned = mat.clone()
@@ -785,7 +897,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       sprite.material = cloned
     }
     sprite.userData = { nodeId: node.id, baseSize }; return sprite
-  }, [sharedMaterials, allFiles, activeMission, isBrokenFile, starSize])
+  }, [sharedMaterials, allFiles, activeMission, soloFamily, isBrokenFile, starSize])
 
   // Track Ctrl key for node drag mode
   useEffect(() => {
@@ -1083,9 +1195,16 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
         )}
 
         <div className={`loom-floating-controls ${selectedNode ? 'panel-open' : ''} panel-${panelSide}`}> 
+          {/* Mission Toolbar */}
+          <button className={`loom-btn ${activeMission === 'risk' ? 'loom-btn-active' : ''}`} onClick={() => onMissionChange?.(activeMission === 'risk' ? null : 'risk')}>Risk</button>
+          <button className={`loom-btn ${activeMission === 'rot' ? 'loom-btn-active' : ''}`} onClick={() => onMissionChange?.(activeMission === 'rot' ? null : 'rot')}>Rot</button>
+          <button className={`loom-btn ${activeMission === 'onboard' ? 'loom-btn-active' : ''}`} onClick={() => onMissionChange?.(activeMission === 'onboard' ? null : 'onboard')}>Onboard</button>
+          <button className={`loom-btn ${activeMission === 'incident' ? 'loom-btn-active' : ''}`} onClick={() => onMissionChange?.(activeMission === 'incident' ? null : 'incident')}>Incident</button>
+          <div className="loom-separator" style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
           <button className={`loom-btn ${isFormationMode ? 'loom-btn-active' : ''}`} onClick={toggleFormationMode}>{isFormationMode ? 'Galaxy' : 'Formation'}</button>
           <button className={`loom-btn ${showExternal ? 'loom-btn-active' : ''}`} onClick={() => setShowExternal(!showExternal)}>External</button>
           <button className="loom-btn" onClick={resetToGodView}>Restore Horizon</button>
+          <button className="loom-btn" onClick={resetCamera}>Reset View</button>
         </div>
         
         {hoverNode && (

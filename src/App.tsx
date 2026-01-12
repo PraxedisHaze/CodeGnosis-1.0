@@ -9,7 +9,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { join } from '@tauri-apps/api/path'
 import { SettingsModal } from './components/SettingsModal'
 import { TabInterface } from './components/TabInterface'
@@ -53,7 +52,14 @@ function App() {
   const [sidebarPosition, setSidebarPosition] = useState<'left' | 'right'>('left')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'analysis' | 'graph' | 'codeCity' | 'vault'>('analysis')
+  const [activeVaultArticleId, setActiveVaultArticleId] = useState<string | undefined>()
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false)
+  
+  const onViewVault = useCallback((articleId: string) => {
+    setActiveVaultArticleId(articleId)
+    setActiveTab('vault')
+  }, [])
+
   const [activeMission, setActiveMission] = useState<string | null>(null)
   const [introComplete, setIntroComplete] = useState(false)
   const [showAnalysisVideo, setShowAnalysisVideo] = useState(false)
@@ -148,8 +154,9 @@ function App() {
       setAnalysisResult(result)
 
       // VIDEO BYPASS: Skip fade interval, show Mission Select immediately
-      setShowWelcomeOverlay(true)
+      // setShowWelcomeOverlay(true)
       setIntroComplete(true)
+      setGraphReady(true)
       /* 
       let opacity = 1
       const fadeInterval = setInterval(() => {
@@ -166,12 +173,7 @@ function App() {
       }, 20)
       */
 
-      if (settings.autoSave) {
-        try {
-          const bundlePath = await join(projectPath, 'ai-bundle.json')
-          await writeTextFile(bundlePath, JSON.stringify(result, null, 2))
-        } catch (saveErr) {}
-      }
+      // Auto-save handled by backend database (SQLite)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setShowAnalysisVideo(false)
@@ -194,10 +196,10 @@ function App() {
           <h1>CodeGnosis</h1>
           <p className="subtitle">Project Analyzer Star</p>
           <div className="header-actions">
-            <Tooltip content={getTooltip(tooltips.sidebar.settings, settings.tooltipLevel)}>
+            <Tooltip content={getTooltip(tooltips.sidebar.settings, settings.tooltipLevel)} title="SETTINGS" anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
               <button className="btn-icon" onClick={() => setIsSettingsOpen(true)}>⚙️</button>
             </Tooltip>
-            <Tooltip content={getTooltip(tooltips.sidebar.toggleSide, settings.tooltipLevel)}>
+            <Tooltip content={getTooltip(tooltips.sidebar.toggleSide, settings.tooltipLevel)} title="SIDEBAR SWAP SIDES" anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
               <button className="btn-toggle-side" onClick={() => setSidebarPosition(p => p === 'left' ? 'right' : 'left')}>
                 {sidebarPosition === 'left' ? '→' : '←'}
               </button>
@@ -206,7 +208,7 @@ function App() {
         </div>
         <div className="sidebar-controls">
           {!projectPath ? (
-            <Tooltip content={getTooltip(tooltips.sidebar.selectDirectory, settings.tooltipLevel)}>
+            <Tooltip content={getTooltip(tooltips.sidebar.selectDirectory, settings.tooltipLevel)} anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
               <button onClick={selectDirectory} className="btn btn-primary btn-hero-large">
                 <span className="hero-text-top">SELECT</span>
                 <span className="hero-text-bottom">DIRECTORY</span>
@@ -214,13 +216,13 @@ function App() {
             </Tooltip>
           ) : (
             <>
-              <Tooltip content={getTooltip(tooltips.sidebar.analyze, settings.tooltipLevel)}>
+              <Tooltip content={getTooltip(tooltips.sidebar.analyze, settings.tooltipLevel)} anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
                 <button onClick={analyzeProject} disabled={loading || !!analysisResult} className="btn btn-success btn-full btn-hero-analyze">
-                  {loading ? 'Analyzing...' : 'IGNITE ENGINE'}
+                  {loading ? 'Analyzing...' : 'ANALYZE PROJECT'}
                 </button>
               </Tooltip>
               <div className="sidebar-controls-row">
-                 <button onClick={selectDirectory} className="btn btn-secondary btn-small" disabled={loading}>Change</button>
+                 {!analysisResult && <button onClick={selectDirectory} className="btn btn-secondary btn-small" disabled={loading}>Change</button>}
                  <button onClick={() => { setProjectPath(''); setAnalysisResult(null); setError(null); }} className="btn btn-secondary btn-small">Reset</button>
               </div>
             </>
@@ -238,13 +240,19 @@ function App() {
           <div className="sidebar-section">
             <h3>Quick Stats</h3>
             <div className="sidebar-stats">
-              <Tooltip content={getTooltip(tooltips.stats.files, settings.tooltipLevel)}>
+              <Tooltip content={getTooltip(tooltips.stats.files, settings.tooltipLevel)} anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
                 <div className="sidebar-stat"><span className="stat-value">{analysisResult.summary?.totalFiles || 0}</span><span className="stat-label">Files</span></div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.stats.links, settings.tooltipLevel)}>
+              <Tooltip content={getTooltip(tooltips.stats.links, settings.tooltipLevel)} anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
                 <div className="sidebar-stat"><span className="stat-value">{analysisResult.summary?.totalConnections || 0}</span><span className="stat-label">Links</span></div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.stats.health, settings.tooltipLevel)}>
+              <Tooltip 
+                content={getTooltip(tooltips.stats.health, settings.tooltipLevel)} 
+                anchored={true} 
+                anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}
+                articleId="concept-health"
+                onViewVault={onViewVault}
+              >
                 <div className="sidebar-stat">
                   <span className="stat-value" style={{ color: (analysisResult.statistics?.connectivityHealthScore || 0) >= 80 ? '#4CAF50' : '#FF9800' }}>
                     {analysisResult.statistics?.connectivityHealthScore || 0}
@@ -277,6 +285,7 @@ function App() {
                 tooltipLevel={settings.tooltipLevel}
                 onNodeClick={(file) => console.log('Selected:', file)}
                 onIntroComplete={handleIntroComplete}
+                onMissionChange={setActiveMission}
               />
             </ErrorBoundary>
           </div>
@@ -300,7 +309,12 @@ function App() {
             )}
 
             {analysisResult && activeTab === 'codeCity' && <CodeCity analysisResult={analysisResult} />}
-            {activeTab === 'vault' && <VaultOfValue />}
+            {activeTab === 'vault' && (
+              <VaultOfValue 
+                activeId={activeVaultArticleId} 
+                onArticleChange={setActiveVaultArticleId} 
+              />
+            )}
 
             {analysisResult && activeTab === 'analysis' && (
               <AnalysisReport
@@ -309,6 +323,7 @@ function App() {
                 onOpenFolder={async () => await invoke('open_folder', { path: projectPath })}
                 onCopyPath={async () => await navigator.clipboard.writeText(projectPath)}
                 onFileClick={(file) => console.log('Navigate to:', file)}
+                onViewVault={onViewVault}
               />
             )}
 
@@ -340,14 +355,6 @@ function App() {
         onSave={(s) => { setSettings(s); setIsSettingsOpen(false); }}
         initialSettings={settings} 
       />
-
-      {showWelcomeOverlay && analysisResult && (introComplete || settings.skipIntroAnimation) && (
-        <WelcomeOverlay
-          result={analysisResult}
-          onClose={(m) => { setShowWelcomeOverlay(false); setGraphReady(true); if (m && m !== 'default') { setActiveMission(m); setActiveTab('graph'); } }}
-          onReset={() => { setShowWelcomeOverlay(false); setProjectPath(''); setAnalysisResult(null); setIntroComplete(false); setGraphReady(false); }}
-        />
-      )}
 
       {/* Analysis video overlay - fades to black when done */}
       {showAnalysisVideo && (
