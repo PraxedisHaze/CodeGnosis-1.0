@@ -19,11 +19,11 @@ import re
 from pathlib import Path
 from datetime import datetime
 
-# Bundle size threshold: 40KB to leave room for conversation context
-BUNDLE_SIZE_LIMIT = 40 * 1024  # 40KB per bundle
+# Bundle size threshold: 500KB (Modern LLM friendly)
+BUNDLE_SIZE_LIMIT = 500 * 1024 
 
-# Chunk size threshold for individual large files: 50KB
-FILE_CHUNK_THRESHOLD = 50 * 1024
+# Chunk size threshold for individual large files: 100KB
+FILE_CHUNK_THRESHOLD = 100 * 1024
 
 # Regex patterns for splitting at function/class boundaries
 CHUNK_PATTERNS = {

@@ -86,10 +86,10 @@ export const tooltips = {
       technical: "Force-directed graph with Three.js/WebGL rendering."
     } as TooltipText,
 
-    codeCity: {
-      friendly: "Your code as a city!",
-      professional: "File sizes become buildings in a virtual city.",
-      technical: "Treemap-to-3D projection of file hierarchy."
+    theConstruct: {
+      friendly: "Step into the blueprint of your creation!",
+      professional: "A structured ledger of every star in the galaxy.",
+      technical: "Tabular representation of project entities, metadata, and topology."
     } as TooltipText,
 
     vault: {

@@ -30,7 +30,7 @@
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
-  z-index: 100;
+  z-index: 500;
   overflow: hidden;
   transition: background 0.3s ease, border-color 0.3s ease;
 }
@@ -240,14 +240,77 @@
 }
 
 /* Results / City Hall / Vault - centered overlay */
-.results, .city-hall, .vault-hall {
+.drawer-panel .results, 
+.drawer-panel .construct-hall, 
+.drawer-panel .vault-hall,
+.drawer-panel .analysis-report {
   flex: 1;
-  background: rgba(20, 20, 30, 0.9);
-  border: 1px solid #444;
-  border-radius: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 2rem;
   overflow-y: auto;
-  margin-top: 4rem;
+  margin-top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- LAYERED DRAWERS --- */
+.drawer-container {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 300;
+}
+
+.drawer-panel {
+  position: absolute;
+  top: 8px;
+  bottom: 70px; /* Leave room for floating controls */
+  left: 60px; /* Clear the vertical tabs */
+  width: 333px;
+  max-width: 90vw;
+  background: rgba(10, 12, 18, 0.95);
+  backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 10px 0 40px rgba(0, 0, 0, 0.8);
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 0 12px 0;
+}
+
+.drawer-panel.closed {
+  transform: translateX(-100%);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.drawer-panel.open {
+  transform: translateX(0);
+}
+
+.wide-drawer {
+  width: 800px;
+  max-width: 95vw;
+}
+
+.sidebar-right .drawer-panel {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-right .drawer-panel.closed {
+  transform: translateX(100%);
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Tabs */
@@ -365,17 +428,6 @@
   90% { transform: translate(25px, -50px) scale(1.2) rotate(5deg); }
   100% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
 }
-
-/* @keyframes flyPath - DELETED */
-
-/* @keyframes manualArc - DELETED */
-
-/* @keyframes flyPath - DELETED */
-
-/* 
- * Remove old keyframes to clean up
- */
-/* @keyframes smoothThrow - DELETED */
 
 /* Quiver after landing - Rotational ONLY around the pinned tip */
 .dart-img.dart-quiver {
@@ -627,4 +679,25 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.analysis-loading-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: 0.5rem;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(0, 212, 255, 0.8);
+  z-index: 10000;
+  pointer-events: none;
+  animation: pulseLoading 1.5s infinite ease-in-out;
+}
+
+@keyframes pulseLoading {
+  0% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.95); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.95); }
 }

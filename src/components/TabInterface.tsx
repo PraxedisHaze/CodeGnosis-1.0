@@ -3,39 +3,40 @@ import './TabInterface.css'
 import { Tooltip } from './Tooltip'
 import { tooltips, getTooltip, VerbosityLevel } from './TooltipContent'
 
-type TabKey = 'analysis' | 'graph' | 'codeCity' | 'vault'
+type TabKey = 'analysis' | 'graph' | 'codeCity' | 'vault' | 'controls'
 
 interface TabInterfaceProps {
-  activeTab: TabKey
-  onTabChange: (tab: TabKey) => void
+  openDrawers: TabKey[]
+  onToggleDrawer: (tab: TabKey) => void
   tooltipLevel: VerbosityLevel
+  sidebarPosition: 'left' | 'right'
 }
 
 const TABS: { key: TabKey; label: string; tooltipKey: keyof typeof tooltips.tabs }[] = [
+  { key: 'controls', label: 'Calibration', tooltipKey: 'graph' },
   { key: 'analysis', label: 'Analysis Report', tooltipKey: 'analysis' },
-  { key: 'graph', label: '3D Graph', tooltipKey: 'graph' },
-  { key: 'codeCity', label: 'Code City', tooltipKey: 'codeCity' },
+  { key: 'codeCity', label: 'The Construct', tooltipKey: 'theConstruct' },
   { key: 'vault', label: 'Vault of Value', tooltipKey: 'vault' }
 ]
 
-export function TabInterface({ activeTab, onTabChange, tooltipLevel }: TabInterfaceProps) {
-  const activeIndex = Math.max(0, TABS.findIndex((tab) => tab.key === activeTab))
-  const indicatorLeft = `${(activeIndex / TABS.length) * 100}%`
-  const indicatorWidth = `${100 / TABS.length}%`
-
+export function TabInterface({ openDrawers, onToggleDrawer, tooltipLevel, sidebarPosition }: TabInterfaceProps) {
   return (
-    <div className="tab-container">
+    <div className={`tab-container side-${sidebarPosition}`}>
       {TABS.map((tab) => (
-        <Tooltip key={tab.key} content={getTooltip(tooltips.tabs[tab.tooltipKey], tooltipLevel)}>
+        <Tooltip 
+          key={tab.key} 
+          content={getTooltip(tooltips.tabs[tab.tooltipKey], tooltipLevel)}
+          anchored={true}
+          anchorDirection="right"
+        >
           <button
-            className={`tab-button ${activeTab === tab.key ? 'active' : ''}`}
-            onClick={() => onTabChange(tab.key)}
+            className={`tab-button ${openDrawers.includes(tab.key) ? 'active' : ''}`}
+            onClick={() => onToggleDrawer(tab.key)}
           >
             {tab.label}
           </button>
         </Tooltip>
       ))}
-      <div className="tab-indicator" style={{ left: indicatorLeft, width: indicatorWidth }} />
     </div>
   )
 }

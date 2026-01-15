@@ -1,7 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import './LoomControlPanel.css'
 import { Tooltip } from './Tooltip'
 import { tooltips, getTooltip, VerbosityLevel } from './TooltipContent'
+
+const CATEGORY_FAMILIES: Record<string, string> = {
+  'TypeScript': 'Logic', 'TypeScript React': 'Logic', 'JavaScript': 'Logic', 'JavaScript Module': 'Logic', 'React': 'Logic', 'Rust': 'Logic', 'Python': 'Logic', 'TypeScript Module': 'Logic',
+  'CSS': 'UI', 'SCSS': 'UI', 'HTML': 'UI', 'JSON': 'Data', 'YAML': 'Data', 'TOML': 'Data', 'SQL': 'Data', 'XML': 'Data',
+  'Config': 'Config', 'ENV': 'Config', 'INI': 'Config', 'Image': 'Assets', 'Font': 'Assets', 'Video': 'Assets', 'Audio': 'Assets',
+  'Markdown': 'Docs', 'Text': 'Docs', 'External': 'External'
+}
 
 // Alphabetized families - grid auto-expands for more
 const FAMILIES = [
@@ -26,6 +33,8 @@ interface Props {
   setLinkOpacity: (val: number) => void
   starBrightness: number
   setStarBrightness: (val: number) => void
+  twinkleIntensity: number
+  setTwinkleIntensity: (val: number) => void
   chargeStrength: number
   setChargeStrength: (val: number) => void
   skybox: string
@@ -33,93 +42,110 @@ interface Props {
   useShapes: boolean
   setUseShapes: (val: boolean) => void
   tooltipLevel: VerbosityLevel
+  legendMode: 'intent' | 'tech'
+  setLegendMode: (mode: 'intent' | 'tech') => void
+  fileTypes: Record<string, string>
+  allFiles: Record<string, any>
 }
 
 export function LoomControlPanel(props: Props) {
-  const [pos, setPos] = useState({ x: 16, y: 24 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
   const [calibrationOpen, setCalibrationOpen] = useState(true)
-  const dragStart = useRef({ x: 0, y: 0 })
   const level = props.tooltipLevel
 
-  useEffect(() => {
-    if (!isDragging) return
-    const onMove = (e: MouseEvent) => {
-      // Clamp position so the 'Controls' box can't leave the viewport
-      const newX = Math.max(0, Math.min(window.innerWidth - 340, e.clientX - dragStart.current.x))
-      const newY = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - dragStart.current.y))
-      setPos({ x: newX, y: newY })
-    }
-    const onUp = () => setIsDragging(false)
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [isDragging])
-
-  const startDrag = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).tagName === 'BUTTON') return
-    setIsDragging(true)
-    dragStart.current = { x: e.clientX - pos.x, y: e.clientY - pos.y }
+  // Map of Anothen Intent labels
+  const ANOTHEN_LABELS: Record<string, string> = {
+    'Logic': 'The Sovereign',
+    'UI': 'The Mirror',
+    'Data': 'The Ground',
+    'Config': 'The Braid',
+    'Assets': 'The Material', // From Lexicon: The Material or Assets
+    'Docs': 'The Archive',
+    'External': 'The External',
+    'Unknown': 'The Void'
   }
 
-  if (collapsed) {
-    return (
-      <div className="lcp" style={{ left: pos.x, top: pos.y }} onClick={() => setCollapsed(false)}>
-        <div className="lcp-collapsed">☰</div>
-      </div>
-    )
+  // Calculate counts for Tech mode
+  const techCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    Object.values(props.fileTypes).forEach(type => {
+      counts[type] = (counts[type] || 0) + 1
+    })
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])
+  }, [props.fileTypes])
+
+  // Calculate counts for Intent mode
+  const intentCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    Object.entries(props.allFiles).forEach(([path, info]) => {
+      // Use the same heuristic as LoomGraph
+      let family = CATEGORY_FAMILIES[info.category] || 'Unknown'
+      const filename = path.split(/[\\/]/).pop()?.toLowerCase() || ''
+      if (filename.includes('config') || filename.includes('settings') || filename.includes('constant')) {
+        family = 'Config'
+      }
+      counts[family] = (counts[family] || 0) + 1
+    })
+    return counts
+  }, [props.allFiles])
+
+  const getTechColor = (type: string): string => {
+    const colors = ['#00BFFF', '#FFD700', '#FF6633', '#32CD32', '#B794F6', '#A8F5C8', '#ff00ff', '#FF4500', '#ADFF2F', '#00FA9A', '#00CED1', '#FF69B4'];
+    let hash = 0; for (let i = 0; i < type.length; i++) hash = ((hash << 5) - hash) + type.charCodeAt(i);
+    return colors[Math.abs(hash) % colors.length];
   }
 
   return (
-    <div className="lcp" style={{ left: pos.x, top: pos.y }}>
-      <div className="lcp-header" onMouseDown={startDrag}>
-        <span>Controls</span>
-        <button onClick={() => setCollapsed(true)}>−</button>
+    <div className="lcp-static">
+      <div className="lcp-header-static">
+        <span>Map Legend</span>
+        <div className="lcp-mode-toggle">
+          <button className={props.legendMode === 'intent' ? 'active' : ''} onClick={() => props.setLegendMode('intent')}>Intent</button>
+          <button className={props.legendMode === 'tech' ? 'active' : ''} onClick={() => props.setLegendMode('tech')}>Tech</button>
+        </div>
       </div>
 
       <div className="lcp-body">
-        {/* LEGEND */}
+        {/* DYNAMIC LEGEND */}
         <div className="lcp-section">
-          <div className="lcp-section-title">Galaxy Map</div>
+          <div className="lcp-section-title">
+            {props.legendMode === 'intent' ? 'Anothen Intent' : 'Technology Type'}
+          </div>
           <div className="lcp-legend-grid">
-            {FAMILIES.map(fam => {
-              const active = props.soloFamily === fam.name
-              return (
-                <div
-                  key={fam.name}
-                  className={`lcp-legend-item ${active ? 'active' : ''}`}
-                  style={{ 
-                    background: `${fam.color}15`, // Dimly colored background (15% opacity)
-                    color: active ? '#fff' : 'rgba(255,255,255,0.7)'
-                  }}
-                  onClick={() => props.onSoloFamily(fam.name)}
-                >
+            {props.legendMode === 'intent' ? (
+              FAMILIES.map(fam => {
+                const count = intentCounts[fam.name] || 0
+                const active = props.soloFamily === fam.name
+                if (count === 0) return null // Hide empty families
+                return (
                   <div
-                    className="lcp-dot"
-                    style={{ 
-                      background: fam.color,
-                      color: fam.color, // For box-shadow currentColor
-                      boxShadow: `0 0 10px ${fam.color}` 
-                    }}
-                  />
-                  <span>{fam.name}</span>
-                </div>
-              )
-            })}
+                    key={fam.name}
+                    className={`lcp-legend-item ${active ? 'active' : ''}`}
+                    style={{ background: `${fam.color}15`, color: active ? '#fff' : 'rgba(255,255,255,0.7)' }}
+                    onClick={() => props.onSoloFamily(fam.name)}
+                  >
+                    <div className="lcp-dot" style={{ background: fam.color, boxShadow: `0 0 10px ${fam.color}` }} />
+                    <span className="lcp-label-text">{ANOTHEN_LABELS[fam.name]}</span>
+                    <span className="lcp-count">{count}</span>
+                  </div>
+                )
+              })
+            ) : (
+              techCounts.map(([type, count]) => {
+                const color = getTechColor(type)
+                return (
+                  <div key={type} className="lcp-legend-item" style={{ background: `${color}15` }}>
+                    <div className="lcp-dot" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
+                    <span className="lcp-label-text">{type}</span>
+                    <span className="lcp-count">{count}</span>
+                  </div>
+                )
+              })
+            )}
           </div>
         </div>
 
-        {/* CALIBRATION */}
-        <div className="lcp-section">
-          <div className="lcp-section-title lcp-clickable" onClick={() => setCalibrationOpen(!calibrationOpen)}>
-            Calibration <span>{calibrationOpen ? '−' : '+'}</span>
-          </div>
-          {calibrationOpen && (
-            <div className="lcp-calibration">
+        {/* CALIBRATION */}        <div className="lcp-section">
+          <div className="lcp-calibration">
               <Tooltip content={getTooltip(tooltips.controls.atmosphere, level)} anchored>
                 <div className="lcp-slider">
                   <label>Atmosphere <small>(Bloom)</small></label>
@@ -148,27 +174,34 @@ export function LoomControlPanel(props: Props) {
                   <span>{Math.round(props.starBrightness * 100)}%</span>
                 </div>
               </Tooltip>
+              <Tooltip content={getTooltip(tooltips.settings.twinkle, level)} anchored>
+                <div className="lcp-slider">
+                  <label>Twinkle <small>(Animation)</small></label>
+                  <input type="range" min="0" max="1" step="0.1" value={props.twinkleIntensity} onChange={e => props.setTwinkleIntensity(+e.target.value)} />
+                  <span>{Math.round(props.twinkleIntensity * 100)}%</span>
+                </div>
+              </Tooltip>
               <Tooltip content={getTooltip(tooltips.controls.spread, level)} anchored>
                 <div className="lcp-slider">
                   <label>Spread <small>(Gravity)</small></label>
                   <div className="lcp-segmented-control">
-                    <button 
-                      className={props.chargeStrength > -30 ? 'active' : ''} 
-                      onClick={() => props.setChargeStrength(-10)}
+                    <button
+                      className={props.chargeStrength > -40 ? 'active' : ''}
+                      onClick={() => props.setChargeStrength(-25)}
                       title="Compact View"
                     >
                       Tight
                     </button>
-                    <button 
-                      className={props.chargeStrength <= -30 && props.chargeStrength > -100 ? 'active' : ''} 
+                    <button
+                      className={props.chargeStrength <= -40 && props.chargeStrength > -100 ? 'active' : ''}
                       onClick={() => props.setChargeStrength(-60)}
                       title="Standard View"
                     >
                       Norm
                     </button>
-                    <button 
-                      className={props.chargeStrength <= -100 ? 'active' : ''} 
-                      onClick={() => props.setChargeStrength(-300)}
+                    <button
+                      className={props.chargeStrength <= -100 ? 'active' : ''}
+                      onClick={() => props.setChargeStrength(-150)}
                       title="Expanded View"
                     >
                       Wide
@@ -193,11 +226,11 @@ export function LoomControlPanel(props: Props) {
                     <option value="aurora">Aurora Green</option>
                     <option value="ember">Ember Red</option>
                     <option value="twilight">Twilight</option>
+                    <option value="blueprint">Blueprint (Light)</option>
                   </select>
                 </div>
               </Tooltip>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

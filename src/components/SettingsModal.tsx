@@ -86,19 +86,6 @@ export function SettingsModal({ isOpen, onClose, onSave, initialSettings }: Sett
           </div>
 
           <div className="settings-group">
-            <label>Star Twinkle Intensity</label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={settings.twinkleIntensity}
-              onChange={e => setSettings({...settings, twinkleIntensity: parseFloat(e.target.value)})}
-            />
-            <p className="hint">{settings.twinkleIntensity === 0 ? 'Off' : `${Math.round(settings.twinkleIntensity * 100)}%`}</p>
-          </div>
-
-          <div className="settings-group">
             <label>Visual Theme</label>
             <select
               value={settings.skybox}

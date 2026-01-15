@@ -1,41 +1,91 @@
 .tab-container {
   display: flex;
-  position: relative;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  padding: 4px;
-  gap: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-direction: column;
+  position: absolute;
+  top: 120px; /* Offset from top */
+  gap: 12px;
+  background: transparent;
+  border: none;
+  z-index: 400; /* Above content shield */
+}
+
+/* Sidebar on Left -> Tabs on Left edge of Main Content */
+.tab-container.side-left {
+  left: 0;
+}
+
+/* Sidebar on Right -> Tabs on Right edge of Main Content */
+.tab-container.side-right {
+  right: 0;
 }
 
 .tab-button {
-  background: transparent;
-  border: none;
-  color: #a1a1aa;
-  padding: 0.5rem 1.25rem;
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-size: 0.85rem;
-  font-weight: 600;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(0deg); 
+  padding: 1.5rem 0.6rem;
+  background: rgba(15, 20, 35, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #8892b0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   cursor: pointer;
-  border-radius: 8px;
-  position: relative;
-  z-index: 2;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  letter-spacing: 0.02em;
+  
+  /* Mechanical Tab Shape */
+  border-radius: 0 6px 6px 0; /* Default Left-side attachment */
+  border-left: none;
+  
+  /* Depth */
+  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   white-space: nowrap;
 }
 
-.tab-button.active {
-  color: #fff;
-  background: rgba(0, 191, 255, 0.15);
-  box-shadow: 0 0 15px rgba(0, 191, 255, 0.1);
+/* Right side variant */
+.tab-container.side-right .tab-button {
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: -4px 4px 10px rgba(0, 0, 0, 0.5);
 }
 
-.tab-button:hover:not(.active) {
+.tab-button:hover {
+  background: rgba(30, 40, 60, 1);
   color: #fff;
-  background: rgba(255, 255, 255, 0.05);
+  transform: rotate(0deg) translateX(-2px);
+}
+
+.tab-container.side-right .tab-button:hover {
+  transform: rotate(0deg) translateX(2px);
+}
+
+.tab-button.active {
+  background: #00d4ff;
+  color: #000;
+  border-color: #00d4ff;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+  z-index: 10;
+}
+
+/* Active state pop-out */
+.tab-container.side-left .tab-button.active {
+  transform: rotate(0deg) translateX(-6px);
+  border-radius: 0 8px 8px 0;
+}
+
+.tab-container.side-right .tab-button.active {
+  transform: rotate(0deg) translateX(6px);
+  border-radius: 8px 0 0 8px;
 }
 
 .tab-indicator {
-  display: none; /* Removed the line indicator for a cleaner button-fill look */
+  display: none;
 }

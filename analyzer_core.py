@@ -2039,7 +2039,8 @@ def analyze_project_cli(
 
         # --- MULTIPLIER: AI Context Packaging ---
         if ai_packager:
-            ai_bundle_name = f"ai_bundle_{report['projectName']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            # Use consistent filename to overwrite instead of creating new files
+            ai_bundle_name = f"ai_bundle_{report['projectName']}.txt"
             ai_bundle_path = Path(project_path) / ai_bundle_name
             ai_packager.package_for_ai(report, ai_bundle_path, project_path)
 

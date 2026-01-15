@@ -1,37 +1,64 @@
-.lcp {
-  position: absolute;
-  width: 340px;
-  max-width: calc(100vw - 32px);
-  background: rgba(10, 10, 20, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+.lcp, .lcp-static {
+  position: relative; /* Static flow */
+  width: 100%;
+  background: rgba(10, 12, 18, 0.95);
+  backdrop-filter: blur(8px);
   color: #fff;
-  z-index: 500;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  user-select: none;
+  user-select: none; /* Prevent highlighting */
 }
 
-.lcp-header {
+.lcp-header, .lcp-header-static {
   padding: 10px 16px;
   background: rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  cursor: grab;
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
 }
 
+.lcp-mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.lcp-mode-toggle button {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.lcp-mode-toggle button.active {
+  background: #00d4ff;
+  color: #000;
+  font-weight: bold;
+}
+
+.lcp-label-text {
+  flex: 1;
+}
+
+.lcp-count {
+  font-family: monospace;
+  opacity: 0.5;
+  font-size: 0.7rem;
+}
+
 .lcp-body {
   padding: 12px;
-  max-height: 80vh;
-  overflow-y: auto;
+  overflow-y: hidden;
 }
 
 /* SECTION HEADERS */
@@ -116,7 +143,9 @@
 }
 
 .lcp-slider input[type="range"] {
-  width: 100%;
+  width: 85%;
+  margin: 0 auto;
+  display: block;
   accent-color: #00d4ff;
 }
 

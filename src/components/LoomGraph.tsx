@@ -12,8 +12,8 @@ import * as THREE from 'three'
 import SpriteText from 'three-spritetext'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { forceManyBody, forceLink, forceCenter } from 'd3-force-3d'
-import { LoomControlPanel } from './LoomControlPanel'
 import { VerbosityLevel } from './TooltipContent'
+import { NodeInfoPanel } from './NodeInfoPanel'
 import './LoomGraph.css'
 
 interface LoomGraphProps {
@@ -31,6 +31,15 @@ interface LoomGraphProps {
   onNodeClick?: (file: string) => void
   onIntroComplete?: () => void
   onMissionChange?: (mission: string | null) => void
+  // Lifted Props
+  bloomIntensity: number
+  starSize: number
+  linkOpacity: number
+  chargeStrength: number
+  useShapes: boolean
+  selectedFamilies: string[]
+  soloFamily: string | null
+  legendMode: 'intent' | 'tech'
 }
 
 // Skybox gradient definitions
@@ -40,7 +49,8 @@ const SKYBOX_PRESETS: Record<string, { top: string, bottom: string, horizon: str
   cosmos: { top: '#0a1628', bottom: '#000510', horizon: '#152238', name: 'Cosmic Blue' },
   aurora: { top: '#0a2818', bottom: '#001208', horizon: '#0d3d1f', name: 'Aurora Green' },
   ember: { top: '#2a0a0a', bottom: '#100000', horizon: '#3d1515', name: 'Ember Red' },
-  twilight: { top: '#1a1025', bottom: '#0a0510', horizon: '#2d1a3d', name: 'Twilight' }
+  twilight: { top: '#1a1025', bottom: '#0a0510', horizon: '#2d1a3d', name: 'Twilight' },
+  blueprint: { top: '#e8f4f8', bottom: '#c4dce4', horizon: '#d6e8f0', name: 'Blueprint (Light)' }
 }
 
 interface GraphNode {
@@ -53,12 +63,15 @@ interface GraphLink { source: string; target: string; }
 interface ProminentTrait { label: string; color: string; }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'TypeScript': '#00BFFF', 'TypeScript React': '#00BFFF', 'JavaScript': '#00BFFF', 'React': '#00BFFF', 'Rust': '#00BFFF', 'Python': '#00BFFF',
-  'CSS': '#FFD700', 'SCSS': '#FFD700', 'HTML': '#FFD700',
-  'JSON': '#FF6633', 'YAML': '#FF6633', 'TOML': '#FF6633', 'SQL': '#FF6633',
-  'Config': '#32CD32', 'ENV': '#32CD32', 'INI': '#32CD32',
-  'Image': '#B794F6', 'Font': '#B794F6', 'Video': '#B794F6', 'Audio': '#B794F6',
-  'Markdown': '#A8F5C8', 'Text': '#D4D4DC', 'Unknown': '#D4D4DC', 'External': '#ff00ff'
+  'Logic': '#FFD700',     // The Sovereign (Deep Gold)
+  'UI': '#00BFFF',        // The Mirror (Electric Cyan)
+  'Data': '#228B22',      // The Ground (Forest Green)
+  'Config': '#9370DB',    // The Braid (Steel Purple)
+  'Integrity': '#FF4500', // The Integrity (Vibrant Red)
+  'Common': '#A9A9A9',    // The Common (Soft Gray)
+  'Archive': '#FF8C00',   // The Archive (Burnt Orange)
+  'Void': '#4B0082',      // The Void (Dark Indigo)
+  'External': '#ff00ff'
 }
 
 const CATEGORY_FAMILIES: Record<string, string> = {
@@ -68,13 +81,40 @@ const CATEGORY_FAMILIES: Record<string, string> = {
   'Markdown': 'Docs', 'Text': 'Docs', 'External': 'External'
 }
 
-function getCategoryFamily(category: string): string { return CATEGORY_FAMILIES[category] || 'Unknown' }
+function getCategoryFamily(category: string, filePath?: string): string { 
+  if (filePath) {
+    const filename = filePath.split(/[/\\]/).pop()?.toLowerCase() || ''
+    if (filename.includes('config') || filename.includes('settings') || filename.includes('constant')) {
+      return 'Config' // Intent Mode: The Braid
+    }
+  }
+  return CATEGORY_FAMILIES[category] || 'Unknown' 
+}
 
 function getCategoryColor(category: string): string {
   if (CATEGORY_COLORS[category]) return CATEGORY_COLORS[category]
   const fam = getCategoryFamily(category)
   const famColors: Record<string, string> = { 'Logic': '#00BFFF', 'UI': '#FFD700', 'Data': '#FF6633', 'Config': '#32CD32', 'Assets': '#B794F6', 'Docs': '#A8F5C8', 'Unknown': '#D4D4DC', 'External': '#ff00ff' }
   return famColors[fam] || '#D4D4DC'
+}
+
+const TECH_COLORS: Record<string, string> = {
+  'TypeScript': '#3178c6', 'TypeScript React': '#3178c6',
+  'JavaScript': '#f7df1e', 'JavaScript React': '#f7df1e',
+  'React': '#61dafb',
+  'Rust': '#dea584',
+  'Python': '#3572a5',
+  'CSS': '#563d7c', 'SCSS': '#c6538c', 'HTML': '#e34c26',
+  'JSON': '#f1e05a', 'YAML': '#cb171e', 'TOML': '#9c4221', 'SQL': '#e38c00',
+  'Markdown': '#083fa1', 'Text': '#dcdcdc'
+}
+
+function getTechColor(type: string): string {
+  if (TECH_COLORS[type]) return TECH_COLORS[type]
+  // Use a hash-based color generation for consistency
+  const colors = ['#00BFFF', '#FFD700', '#FF6633', '#32CD32', '#B794F6', '#A8F5C8', '#ff00ff', '#FF4500', '#ADFF2F', '#00FA9A', '#00CED1', '#FF69B4'];
+  const hash = hashString(type);
+  return colors[Math.abs(hash) % colors.length];
 }
 
 function createGlowTexture(): THREE.Texture {
@@ -97,6 +137,79 @@ function createGlowTexture(): THREE.Texture {
   grad.addColorStop(1, 'rgba(255, 255, 255, 0)')
   ctx.fillStyle = grad; ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas); tex.needsUpdate = true; return tex
+}
+
+function createShapeTexture(type: 'oval' | 'rect' | 'parallelogram' | 'cylinder' | 'doc' | 'diamond' | 'hexagon'): THREE.Texture {
+  const size = 256, canvas = document.createElement('canvas')
+  canvas.width = size; canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  const c = size / 2
+  const r = size * 0.35 // Base radius for shapes
+
+  ctx.fillStyle = 'white'
+  ctx.strokeStyle = 'white'
+  ctx.lineWidth = 8
+  ctx.beginPath()
+
+  if (type === 'oval') {
+    ctx.ellipse(c, c, r * 1.2, r * 0.8, 0, 0, Math.PI * 2)
+    ctx.fill()
+  } else if (type === 'rect') {
+    ctx.rect(c - r, c - r * 0.7, r * 2, r * 1.4)
+    ctx.fill()
+  } else if (type === 'parallelogram') {
+    ctx.moveTo(c - r * 0.8, c + r * 0.6)
+    ctx.lineTo(c + r * 1.2, c + r * 0.6)
+    ctx.lineTo(c + r * 0.8, c - r * 0.6)
+    ctx.lineTo(c - r * 1.2, c - r * 0.6)
+    ctx.closePath()
+    ctx.fill()
+  } else if (type === 'cylinder') {
+    const w = r * 1.6, h = r * 1.4
+    ctx.ellipse(c, c - h/2, w/2, h/4, 0, 0, Math.PI * 2) // Top
+    ctx.fill()
+    ctx.beginPath()
+    ctx.rect(c - w/2, c - h/2, w, h)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.ellipse(c, c + h/2, w/2, h/4, 0, 0, Math.PI * 2) // Bottom
+    ctx.fill()
+  } else if (type === 'doc') {
+    const w = r * 1.4, h = r * 1.8
+    ctx.moveTo(c - w/2, c - h/2)
+    ctx.lineTo(c + w/2, c - h/2)
+    ctx.lineTo(c + w/2, c + h/2 - 20)
+    // Wavy bottom
+    ctx.bezierCurveTo(c + w/4, c + h/2, c - w/4, c + h/2 - 40, c - w/2, c + h/2 - 20)
+    ctx.closePath()
+    ctx.fill()
+  } else if (type === 'diamond') {
+    ctx.moveTo(c, c - r)
+    ctx.lineTo(c + r, c)
+    ctx.lineTo(c, c + r)
+    ctx.lineTo(c - r, c)
+    ctx.closePath()
+    ctx.fill()
+  } else if (type === 'hexagon') {
+    for (let i = 0; i < 6; i++) {
+      const angle = i * Math.PI / 3
+      const x = c + r * Math.cos(angle)
+      const y = c + r * Math.sin(angle)
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+    }
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  // Add glow
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.shadowColor = 'white'
+  ctx.shadowBlur = 20
+  ctx.stroke() // Outline glow
+
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.needsUpdate = true
+  return tex
 }
 
 function createStarTexture(): THREE.Texture {
@@ -178,12 +291,33 @@ function createSkyboxTexture(topColor: string, bottomColor: string, horizonColor
   return texture
 }
 
-export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, brokenReferences, activeMission, skipIntroAnimation, twinkleIntensity = 0.5, starBrightness: initialStarBrightness = 1.0, skybox = 'none', tooltipLevel = 'professional', onNodeClick, onIntroComplete, onMissionChange }: LoomGraphProps) {
+export function LoomGraph({ 
+  dependencyGraph, fileTypes, allFiles, cycles, brokenReferences, activeMission, 
+  skipIntroAnimation, twinkleIntensity = 0.5, starBrightness: initialStarBrightness = 1.0, 
+  skybox = 'none', tooltipLevel = 'professional', onNodeClick, onIntroComplete, onMissionChange,
+  // Lifted Props
+  bloomIntensity, starSize, linkOpacity, chargeStrength, useShapes, selectedFamilies, soloFamily, legendMode
+}: LoomGraphProps) {
+  console.log("Gnosis: LoomGraph Mounting...", { legendMode });
   // --- 1. STATE & REFS ---
   const fgRef = useRef<any>()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const bloomPassRef = useRef<any>(null)
+  const cameraInitialized = useRef(false)
+  const starfieldRef = useRef<any>(null)
+  const twinkleAnimationRef = useRef<number | null>(null)
+  const missionProgressRef = useRef(0)
+  const formationProgress = useRef(0)
+  const isAnimating = useRef(false)
+  const storedForces = useRef<any>(null)
+
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
-  const [selectedFamilies, setSelectedFamilies] = useState<string[]>([])
-  const [soloFamily, setSoloFamily] = useState<string | null>(null)
+  const [showIntroVideo, setShowIntroVideo] = useState(!skipIntroAnimation)
+  const [introVideoOpacity, setIntroVideoOpacity] = useState(1)
+  const [videoPlayedOnce, setVideoPlayedOnce] = useState(false)
+  const [isExploding, setIsExploding] = useState(!skipIntroAnimation) // Start exploded if skipping intro
+  
   const [showExternal, setShowExternal] = useState(true)
   const [isFormationMode, setIsFormationMode] = useState(false)
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
@@ -191,30 +325,17 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
   const [hoverNode, setHoverNode] = useState<GraphNode | null>(null)
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 })
   
-  const [bloomIntensity, setBloomIntensity] = useState(1.35)
-  const [linkOpacity, setLinkOpacity] = useState(0.4)
-  const [starSize, setStarSize] = useState(0.3)
-  const [starBrightness, setStarBrightness] = useState(initialStarBrightness)
-  const [chargeStrength, setChargeStrength] = useState(-40)
   const [dragEnabled, setDragEnabled] = useState(false)
   const [localSkybox, setLocalSkybox] = useState(skybox)
   
+  // Sync localSkybox with prop
+  useEffect(() => {
+    setLocalSkybox(skybox)
+  }, [skybox])
+
+  const starBrightness = initialStarBrightness;
+
   const explosionProgressRef = useRef(0)
-  const missionProgressRef = useRef(0)
-  const formationProgress = useRef(0)
-  // FORCE VISIBILITY: Intro OFF by default for debugging
-  const [showIntroVideo, setShowIntroVideo] = useState(false) 
-  const [introVideoOpacity, setIntroVideoOpacity] = useState(0)
-  const [videoPlayedOnce, setVideoPlayedOnce] = useState(true)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [isExploding, setIsExploding] = useState(false)
-  const isAnimating = useRef(false)
-  const storedForces = useRef<any>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const cameraInitialized = useRef(false)
-  const starfieldRef = useRef<{ colors: Float32Array, baseColors: Float32Array, phases: Float32Array } | null>(null)
-  const twinkleAnimationRef = useRef<number | null>(null)
-  const bloomPassRef = useRef<any | null>(null)
 
   // FORCE OPACITY: 1.0
   const [canvasOpacity, setCanvasOpacity] = useState(1)
@@ -293,14 +414,17 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
     let sunId = '', maxC = 0
     nodeSet.forEach(f => { if (incoming[f] > maxC) { maxC = incoming[f]; sunId = f; } })
     const familyNodes: Record<string, string[]> = {}
-    nodeSet.forEach(f => { const fam = getCategoryFamily(fileTypes[f] || 'Unknown'); if (!familyNodes[fam]) familyNodes[fam] = []; familyNodes[fam].push(f); })
+    nodeSet.forEach(f => { const fam = getCategoryFamily(fileTypes[f] || 'Unknown', f); if (!familyNodes[fam]) familyNodes[fam] = []; familyNodes[fam].push(f); })
     const nodes = Array.from(nodeSet).map(f => {
-      const cat = fileTypes[f] || 'Unknown', fam = getCategoryFamily(cat), flist = familyNodes[fam] || [], idx = flist.indexOf(f), seed = hashString(f)
+      const cat = fileTypes[f] || 'Unknown', fam = getCategoryFamily(cat, f), flist = familyNodes[fam] || [], idx = flist.indexOf(f), seed = hashString(f)
       const pos = (fam === 'External') ? { x: Math.cos((idx/flist.length)*Math.PI*2)*465, y: (Math.sin(seed)*10-5)*13, z: Math.sin((idx/flist.length)*Math.PI*2)*465 } : getSectorPosition(cat, idx, flist.length, f)
+      
       const inCount = incoming[f] || 0
       const expSize = 6 + Math.pow(inCount, 1.5) * 1.2
       const nodeObj: GraphNode = { id: f, category: cat, group: 0, size: (f === sunId) ? 40 : Math.max(6, Math.min(36, expSize)), ...pos }
-      if (fam === 'External') { nodeObj.fx = pos.x; nodeObj.fy = pos.y; nodeObj.fz = pos.z; }
+      if (fam === 'External') { 
+         nodeObj.fx = pos.x; nodeObj.fy = pos.y; nodeObj.fz = pos.z; 
+      }
       return nodeObj
     })
     const links = []
@@ -325,7 +449,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
 
     // Selected families checkbox filter (hide unchecked families)
     if (selectedFamilies.length > 0) {
-      filtered = filtered.filter(n => selectedFamilies.includes(getCategoryFamily(n.category)))
+      filtered = filtered.filter(n => selectedFamilies.includes(getCategoryFamily(n.category, n.id)))
     }
 
     // Mission filters
@@ -337,7 +461,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
 
     // External toggle
     if (!showExternal) {
-      filtered = filtered.filter(n => getCategoryFamily(n.category) !== 'External')
+      filtered = filtered.filter(n => getCategoryFamily(n.category, n.id) !== 'External')
     }
 
     // Inject Labels for Formation Mode
@@ -416,7 +540,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       }
       // Reset View: teleport camera back to home position and look at center
       fgRef.current.cameraPosition(
-        { x: 0.001, y: 0.001, z: 400 },
+        { x: 0, y: 0, z: 600 },
         { x: 0, y: 0, z: 0 },
         1200
       )
@@ -494,7 +618,8 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
         if (progress < 1) { requestAnimationFrame(animate) } else { isAnimating.current = false }
       }
       requestAnimationFrame(animate)
-      fgRef.current.cameraPosition({ x: 0, y: 300, z: 500 }, { x: 100, y: 50, z: 0 }, 1500)
+      // Front view: camera level with formation, looking straight at X-Y plane
+      fgRef.current.cameraPosition({ x: 0, y: 100, z: 800 }, { x: 0, y: 100, z: 0 }, 1500)
     } else {
       isAnimating.current = false
       formationProgress.current = 0
@@ -535,13 +660,13 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       // SETUP 1: Camera & Horizon
       const cam = fg.camera()
       if (cam) {
-        cam.far = 25000 // Ensure stars aren't clipped
+        cam.far = 50000 // Ensure stars aren't clipped (starfield radius is 45000)
         cam.updateProjectionMatrix()
       }
       
       if (!cameraInitialized.current) { 
-        // LAZARUS FIX: Use 0.001 to bypass library auto-repositioning
-        fg.cameraPosition({ x: 0.001, y: 0.001, z: 400 })
+        // Force graph to center on origin
+        fg.cameraPosition({ x: 0, y: 0, z: 1000 }, { x: 0, y: 0, z: 0 }, 0)
         cameraInitialized.current = true 
       }
 
@@ -553,23 +678,52 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
           controls.enableDamping = true // Smooth feel
           controls.dampingFactor = 0.05
           controls.rotateSpeed = 1.0
-          controls.zoomSpeed = 1.2
+          controls.enableZoom = false // Disable built-in zoom - we handle it manually
           controls.minDistance = 50
-          controls.maxDistance = 4400 // Claude's recommended range
+          controls.maxDistance = 8000 // Extended for wide view
           controls.enablePan = true
           controls.screenSpacePanning = true
           controls.mouseButtons = {
             LEFT: THREE.MOUSE.ROTATE,
-            MIDDLE: THREE.MOUSE.DOLLY,
+            MIDDLE: THREE.MOUSE.PAN, // Middle mouse now pans instead of dolly
             RIGHT: THREE.MOUSE.PAN,
           }
         }
       }
       enforceControls()
-      
+
+      // LINEAR ZOOM: Custom wheel handler - simple forward/back along camera's view direction
+      const renderer = fg.renderer()
+      if (renderer && renderer.domElement) {
+        const handleWheel = (e: WheelEvent) => {
+          e.preventDefault()
+          e.stopPropagation()
+          const cam = fg.camera()
+          if (!cam) return
+
+          const zoomAmount = 300 // Fast zoom per scroll tick
+
+          // Get the direction the camera is looking
+          const direction = new THREE.Vector3()
+          cam.getWorldDirection(direction)
+
+          // Move camera forward/backward along its view direction
+          if (e.deltaY > 0) {
+            // Scroll down = move backward
+            cam.position.addScaledVector(direction, -zoomAmount)
+          } else {
+            // Scroll up = move forward
+            cam.position.addScaledVector(direction, zoomAmount)
+          }
+        }
+        renderer.domElement.addEventListener('wheel', handleWheel, { passive: false, capture: true })
+        ;(window as any).__wheelHandler = handleWheel
+        ;(window as any).__wheelElement = renderer.domElement
+      }
+
       // Clear loop once camera is set
       clearInterval(initCamera)
-      
+
       // Start enforcer for drift prevention
       const controlsEnforcer = setInterval(enforceControls, 500)
       ;(window as any).__controlsEnforcer = controlsEnforcer
@@ -593,74 +747,105 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       const fg = fgRef.current
       if (!fg) return
       const cam = fg.camera()
-      if (cam && cam.position.z > 800) {
+      if (cam && cam.position.z > 1000) {
         // Library pushed camera too far - bring it back
-        fg.cameraPosition({ x: 0.001, y: 0.001, z: 400 }, { x: 0, y: 0, z: 0 }, 0)
+        fg.cameraPosition({ x: 0, y: 0, z: 600 }, { x: 0, y: 0, z: 0 }, 0)
       }
     }, 200) // Run after library's onUpdate
     return () => clearTimeout(timer)
   }, [filteredGraphData])
 
-  // REPAIR: Effect 2 - Visual Enhancements (Bloom)
+  // REPAIR: Effect 2 - Visual Enhancements (Bloom) - Create on mount, update on change
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const fg = fgRef.current; if (!fg) return
+    let attempts = 0
+    const maxAttempts = 30 // 3 seconds
+
+    const initBloom = setInterval(() => {
+      attempts++
+      const fg = fgRef.current
+      if (!fg) {
+        if (attempts > maxAttempts) clearInterval(initBloom)
+        return
+      }
+
       const composer = fg.postProcessingComposer()
-      
-      if (composer && !bloomPassRef.current) {
+      if (!composer) {
+        if (attempts > maxAttempts) clearInterval(initBloom)
+        return
+      }
+
+      // Create bloom pass if it doesn't exist
+      if (!bloomPassRef.current) {
         try {
           const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            bloomIntensity, 
-            0.6, 
-            1.0  
+            bloomIntensity,
+            0.4,
+            0.85
           )
-          // composer.addPass(bloomPass)
-          // bloomPassRef.current = bloomPass
+          composer.addPass(bloomPass)
+          bloomPassRef.current = bloomPass
         } catch (e) {
-          console.error("Atmosphere ignition failed, continuing with standard vision.", e)
+          console.error("Atmosphere ignition failed.", e)
         }
       }
-    }, 200) // Slight delay after core
-    return () => clearTimeout(timer)
-  }, [bloomIntensity]); 
 
-  // Skybox Update Effect (Only when Skybox Changes)
+      clearInterval(initBloom)
+    }, 100)
+
+    return () => clearInterval(initBloom)
+  }, []) // Only run on mount
+
+  // Update bloom intensity when slider changes
+  useEffect(() => {
+    if (bloomPassRef.current) {
+      bloomPassRef.current.strength = bloomIntensity
+    }
+  }, [bloomIntensity]) 
+
+  // PAUSE CONTROL: Handle Stasis Field - Data Gate only (Removed render pause)
+
+  // BIG BANG: Reset positions to origin on load or project change
+
+  // SKYBOX: Isolated effect
   useEffect(() => {
     const fg = fgRef.current; if (!fg) return
     const scene = fg.scene(); 
     if (scene) {
-        const preset = SKYBOX_PRESETS[localSkybox] || SKYBOX_PRESETS.none
-        if (localSkybox !== 'none') {
-          const textures = [
-            createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, true),
-            createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, true),
-            createSkyboxTexture(preset.top, preset.bottom, preset.horizon, true, false),
-            createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, false),
-            createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, true),
-            createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, true),
-          ]
-          scene.background = new THREE.CubeTexture(textures.map(t => t.image))
-          scene.background.needsUpdate = true
+        if (localSkybox === 'blueprint') {
+          scene.background = new THREE.Color(0xf0f4f8) // Light blue-grey paper
         } else {
-          scene.background = new THREE.Color(0x000000)
+          const preset = SKYBOX_PRESETS[localSkybox] || SKYBOX_PRESETS.none
+          if (localSkybox !== 'none') {
+            const textures = [
+              createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, true),
+              createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, true),
+              createSkyboxTexture(preset.top, preset.bottom, preset.horizon, true, false),
+              createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, false),
+              createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, true),
+              createSkyboxTexture(preset.top, preset.bottom, preset.horizon, false, true),
+            ]
+            scene.background = new THREE.CubeTexture(textures.map(t => t.image))
+            scene.background.needsUpdate = true
+          } else {
+            scene.background = new THREE.Color(0x000000)
+          }
         }
     }
   }, [localSkybox]);
 
-  // Starfield Creation & Animation Effect (Run Once with Retry)
+  // Starfield Creation (Run Once)
   useEffect(() => {
     let retryCount = 0
-    const maxRetries = 50 // 5 seconds max
-    
+    const maxRetries = 50
+
     const initStarfield = setInterval(() => {
-      const fg = fgRef.current
-      if (!fg) {
-        retryCount++
-        if (retryCount > maxRetries) clearInterval(initStarfield)
+      retryCount++
+      if (retryCount > maxRetries) {
+        clearInterval(initStarfield)
         return
       }
-      
+
       const scene = fg.scene()
       if (!scene) return
 
@@ -670,86 +855,78 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
           const starTexture = createStarTexture()
           const starColors = [[1.0, 1.0, 1.0], [0.9, 0.95, 1.0], [1.0, 0.95, 0.9], [0.8, 0.9, 1.0], [1.0, 0.98, 0.8], [0.95, 0.9, 1.0]]
           const layers = [
-            { name: 'starfield-far', count: 10000, radius: 45000, size: 72.0, parallax: 0.02 },
-            { name: 'starfield-mid', count: 5000, radius: 30000, size: 54.0, parallax: 0.06 },
-            { name: 'starfield-near', count: 2000, radius: 15000, size: 36.0, parallax: 0.12 },
+            { name: 'starfield-far', count: 4000, radius: 6000, size: 24.0, parallax: 0.02 },
+            { name: 'starfield-mid', count: 2000, radius: 4000, size: 18.0, parallax: 0.06 },
+            { name: 'starfield-near', count: 800, radius: 2500, size: 12.0, parallax: 0.12 },
           ]
-          const allLayerData: Array<{ geo: THREE.BufferGeometry, colors: Float32Array, baseColors: Float32Array, phases: Float32Array, mesh: THREE.Points, parallax: number }> = []
+          const allLayerData: any[] = []
           layers.forEach(layer => {
             const geo = new THREE.BufferGeometry()
-            const pos = new Float32Array(layer.count * 3)
-            const colors = new Float32Array(layer.count * 3)
-            const baseColors = new Float32Array(layer.count * 3)
-            const phases = new Float32Array(layer.count)
+            const pos = new Float32Array(layer.count * 3), colors = new Float32Array(layer.count * 3), baseColors = new Float32Array(layer.count * 3), phases = new Float32Array(layer.count)
             for (let i = 0; i < layer.count; i++) {
-              pos[i * 3] = (Math.random() - 0.5) * layer.radius
-              pos[i * 3 + 1] = (Math.random() - 0.5) * layer.radius
-              pos[i * 3 + 2] = (Math.random() - 0.5) * layer.radius
-              const color = starColors[Math.floor(Math.random() * starColors.length)]
-              baseColors[i * 3] = color[0]; baseColors[i * 3 + 1] = color[1]; baseColors[i * 3 + 2] = color[2]
-              colors[i * 3] = color[0]; colors[i * 3 + 1] = color[1]; colors[i * 3 + 2] = color[2]
-              phases[i] = Math.random() * Math.PI * 2
+              pos[i*3] = (Math.random()-0.5)*layer.radius; pos[i*3+1] = (Math.random()-0.5)*layer.radius; pos[i*3+2] = (Math.random()-0.5)*layer.radius
+              const color = starColors[Math.floor(Math.random()*starColors.length)]
+              baseColors[i*3] = color[0]; baseColors[i*3+1] = color[1]; baseColors[i*3+2] = color[2]
+              colors[i*3] = color[0]; colors[i*3+1] = color[1]; colors[i*3+2] = color[2]
+              phases[i] = Math.random()*Math.PI*2
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
             geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-            const material = new THREE.PointsMaterial({
-              size: layer.size, map: starTexture, transparent: true, opacity: 1.0, vertexColors: true, blending: THREE.AdditiveBlending, sizeAttenuation: true, depthWrite: false
-            })
+            const material = new THREE.PointsMaterial({ size: layer.size, map: starTexture, transparent: true, opacity: 1.0, vertexColors: true, blending: THREE.AdditiveBlending, sizeAttenuation: true, depthWrite: false })
             const mesh = new THREE.Points(geo, material)
-            mesh.name = layer.name
-            scene.add(mesh)
+            mesh.name = layer.name; scene.add(mesh)
             allLayerData.push({ geo, colors, baseColors, phases, mesh, parallax: layer.parallax })
           })
-          starfieldRef.current = { colors: allLayerData[0].colors, baseColors: allLayerData[0].baseColors, phases: allLayerData[0].phases, layers: allLayerData } as any
-          let lastCamPos = new THREE.Vector3(0, 0, 400)
+          starfieldRef.current = { layers: allLayerData }
           
+          let lastCamPos = new THREE.Vector3(0, 0, 400)
           const animateTwinkle = () => {
-            const layerData = (starfieldRef.current as any)?.layers
+            const layerData = starfieldRef.current?.layers
             if (!layerData) { twinkleAnimationRef.current = requestAnimationFrame(animateTwinkle); return }
-            const time = Date.now() * 0.001
-            const cam = fg.camera()
+            const time = Date.now() * 0.001, cam = fg.camera()
             const camPos = cam ? cam.position.clone() : new THREE.Vector3(0, 0, 400)
             const delta = new THREE.Vector3().subVectors(camPos, lastCamPos)
             lastCamPos.copy(camPos)
             
-            // Read LIVE values from Refs (No Stale Closures!)
-            const tIntensity = twinkleIntensityRef.current
-            const sBrightness = starBrightnessRef.current
+            const tIntensity = twinkleIntensityRef.current, sBrightness = starBrightnessRef.current
 
             layerData.forEach((layer: any) => {
               const { geo, colors, baseColors, phases, mesh, parallax } = layer
-              const count = phases.length
               mesh.position.x -= delta.x * parallax; mesh.position.y -= delta.y * parallax; mesh.position.z -= delta.z * parallax
               const positions = geo.getAttribute('position') as THREE.BufferAttribute
-              for (let i = 0; i < count; i++) {
-                const sx = positions.getX(i) + mesh.position.x
-                const sy = positions.getY(i) + mesh.position.y
-                const sz = positions.getZ(i) + mesh.position.z
-                const dist = Math.sqrt((camPos.x - sx) ** 2 + (camPos.y - sy) ** 2 + (camPos.z - sz) ** 2)
-                const fadeDist = Math.max(0, Math.min(1, (dist - 200) / 150))
-                const phase = phases[i]
+              for (let i = 0; i < phases.length; i++) {
+                const sx = positions.getX(i) + mesh.position.x, sy = positions.getY(i) + mesh.position.y, sz = positions.getZ(i) + mesh.position.z
+                const dist = Math.sqrt((camPos.x-sx)**2 + (camPos.y-sy)**2 + (camPos.z-sz)**2)
+                const fadeDist = Math.max(0, Math.min(1, (dist-200)/150)), phase = phases[i]
                 const twinkle = tIntensity > 0 ? 0.7 + 0.3 * Math.sin(time * (1 + phase * 0.5) + phase) * tIntensity : 1.0
                 const brightness = twinkle * fadeDist * sBrightness
-                colors[i * 3] = baseColors[i * 3] * brightness; colors[i * 3 + 1] = baseColors[i * 3 + 1] * brightness; colors[i * 3 + 2] = baseColors[i * 3 + 2] * brightness
+                colors[i*3] = baseColors[i*3]*brightness; colors[i*3+1] = baseColors[i*3+1]*brightness; colors[i*3+2] = baseColors[i*3+2]*brightness
               }
-              const colorAttr = geo.getAttribute('color') as THREE.BufferAttribute
-              colorAttr.needsUpdate = true
+              (geo.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true
             })
             twinkleAnimationRef.current = requestAnimationFrame(animateTwinkle)
           }
           animateTwinkle()
       }
     }, 100)
-    return () => {
-      clearInterval(initStarfield)
-      if (twinkleAnimationRef.current) cancelAnimationFrame(twinkleAnimationRef.current)
-    }
-  }, []) // Empty deps = run once
+    return () => { clearInterval(initStarfield); if (twinkleAnimationRef.current) cancelAnimationFrame(twinkleAnimationRef.current) }
+  }, []) 
+
+  // Track previous mission to detect mission changes (not manual Formation toggle)
+  const prevMissionRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!fgRef.current || isExploding) return
-    if (activeMission && activeMission !== 'default' && !isFormationMode) toggleFormationMode()
-    else if (!activeMission && isFormationMode) toggleFormationMode()
+
+    // Only auto-toggle Formation when MISSION changes, not when isFormationMode changes
+    const missionChanged = prevMissionRef.current !== activeMission
+    prevMissionRef.current = activeMission
+
+    if (missionChanged) {
+      if (activeMission && activeMission !== 'default' && !isFormationMode) toggleFormationMode()
+      else if (!activeMission && isFormationMode) toggleFormationMode()
+    }
+
     missionProgressRef.current = 0; const start = Date.now()
     const animateMiss = () => {
       const p = Math.min((Date.now() - start) / 1000, 1)
@@ -759,18 +936,12 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
     requestAnimationFrame(animateMiss)
   }, [activeMission, soloFamily, isExploding, isFormationMode, toggleFormationMode])
 
-  useEffect(() => {
-    if (bloomPassRef.current) {
-      bloomPassRef.current.strength = bloomIntensity
-    }
-  }, [bloomIntensity])
-
-  // Force graph refresh when starSize changes so nodeThreeObject re-renders
+  // Force graph refresh when visual parameters change so nodeThreeObject re-renders
   useEffect(() => {
     if (fgRef.current) {
       fgRef.current.refresh()
     }
-  }, [starSize])
+  }, [starSize, soloFamily, activeMission, useShapes])
 
   // Update charge force when slider changes (Galaxy) OR Tightness (Formation)
   useEffect(() => {
@@ -799,6 +970,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       fgRef.current.refresh();
     } else {
       fgRef.current.d3Force('charge', forceManyBody().strength(chargeStrength))
+      fgRef.current.d3Force('center', forceCenter().strength(0.6)) // Anchor the Big Bang
       fgRef.current.d3ReheatSimulation()
     }
   }, [chargeStrength, isFormationMode])
@@ -823,6 +995,19 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
   }, [allFiles])
 
   const glowTexture = useMemo(() => createGlowTexture(), [])
+
+  // Shape textures for different families
+  const shapeTextures = useMemo(() => ({
+    Logic: createShapeTexture('hexagon'),      // Code/Logic = Hexagon
+    UI: createShapeTexture('rect'),            // UI = Rectangle
+    Data: createShapeTexture('cylinder'),      // Data = Cylinder (database)
+    Config: createShapeTexture('diamond'),     // Config = Diamond
+    Assets: createShapeTexture('oval'),        // Assets = Oval
+    Docs: createShapeTexture('doc'),           // Docs = Document
+    External: createShapeTexture('parallelogram'), // External = Parallelogram
+    Unknown: createShapeTexture('oval')
+  }), [])
+
   const sharedMaterials = useMemo(() => {
     const mats: Record<string, THREE.SpriteMaterial> = {}
     Object.keys(CATEGORY_COLORS).forEach(cat => {
@@ -830,6 +1015,17 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
     })
     return mats
   }, [glowTexture])
+
+  const shapeMaterials = useMemo(() => {
+    const mats: Record<string, THREE.SpriteMaterial> = {}
+    const families = ['Logic', 'UI', 'Data', 'Config', 'Assets', 'Docs', 'External', 'Unknown']
+    families.forEach(fam => {
+      const tex = shapeTextures[fam as keyof typeof shapeTextures]
+      const color = { Logic: '#00BFFF', UI: '#FFD700', Data: '#FF6633', Config: '#32CD32', Assets: '#B794F6', Docs: '#A8F5C8', External: '#ff00ff', Unknown: '#D4D4DC' }[fam] || '#D4D4DC'
+      mats[fam] = new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(color), transparent: true, opacity: 1.0, depthWrite: false, depthTest: true })
+    })
+    return mats
+  }, [shapeTextures])
 
   const nodeThreeObject = useCallback((node: GraphNode) => {
     // Handle Label Nodes
@@ -844,12 +1040,19 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       return sprite;
     }
 
-    const mat = sharedMaterials[node.category] || sharedMaterials['Unknown']; if (!mat) return new THREE.Object3D() // Ensure mat is not undefined
+    const nodeFamily = getCategoryFamily(node.category, node.id)
+    const mat = useShapes
+      ? (shapeMaterials[nodeFamily] || shapeMaterials['Unknown'])
+      : (sharedMaterials[nodeFamily] || sharedMaterials['Unknown'])
+    if (!mat) return new THREE.Object3D() // Ensure mat is not undefined
     const sprite = new THREE.Sprite(mat), baseSize = node.size * 2
     let tScale = 1.0, tOpacity = 1.0, tColor: string | null = null
     const missP = missionProgressRef.current
-    
-    const nodeFamily = getCategoryFamily(node.category)
+
+    // Apply color based on mode
+    if (legendMode === 'tech') {
+      tColor = getTechColor(node.category)
+    }
 
     // PRIORITY 1: Solo Family Highlight (Legend) - Soft Filter
     if (soloFamily) {
@@ -897,7 +1100,7 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
       sprite.material = cloned
     }
     sprite.userData = { nodeId: node.id, baseSize }; return sprite
-  }, [sharedMaterials, allFiles, activeMission, soloFamily, isBrokenFile, starSize])
+  }, [sharedMaterials, shapeMaterials, useShapes, allFiles, activeMission, soloFamily, isBrokenFile, starSize, legendMode])
 
   // Track Ctrl key for node drag mode
   useEffect(() => {
@@ -1147,18 +1350,6 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
   return (
     <div className="loom-container" ref={containerRef}>
       <div className="loom-ui-layer"> 
-        <LoomControlPanel
-          selectedFamilies={selectedFamilies} soloFamily={soloFamily}
-          onToggleFamily={f => setSelectedFamilies(prev => prev.includes(f) ? prev.filter(x=>x!==f) : [...prev, f])}
-          onSoloFamily={f => setSoloFamily(p => p === f ? null : f)}
-          bloomIntensity={bloomIntensity} setBloomIntensity={setBloomIntensity}
-          starSize={starSize} setStarSize={setStarSize}
-          linkOpacity={linkOpacity} setLinkOpacity={setLinkOpacity}
-          starBrightness={starBrightness} setStarBrightness={setStarBrightness}
-          chargeStrength={chargeStrength} setChargeStrength={setChargeStrength}
-          skybox={localSkybox} setSkybox={setLocalSkybox}
-          tooltipLevel={tooltipLevel}
-        />
 
         {showIntroVideo && (
           <div
@@ -1180,18 +1371,17 @@ export function LoomGraph({ dependencyGraph, fileTypes, allFiles, cycles, broken
         )}
         
         {selectedNode && selectedNodeInfo && (
-          <div className={`loom-info-panel side-${panelSide}`}>
-            <div className="info-header">
-              <div className="info-header-buttons">
-                <button className="info-side-toggle" onClick={() => setPanelSide(p => p === 'left' ? 'right' : 'left')}>{panelSide === 'left' ? '→' : '←'}</button>
-                <button className="info-close" onClick={() => setSelectedNode(null)}>x</button>
-              </div>
-              <span className="info-filename">{selectedNode.split('/').pop()}</span>
-            </div>
-            <div className="info-path">{selectedNode}</div>
-            <div className="info-section"><div className="info-label">Trait</div><div className="info-trait" style={{ color: getProminentTrait(selectedNode).color }}>{getProminentTrait(selectedNode).label}</div></div>
-            {/* Info panel content truncated for brevity in this rewrite, assuming logic is sound */}
-          </div>
+          <NodeInfoPanel
+            nodeId={selectedNode}
+            nodeInfo={selectedNodeInfo}
+            fileType={fileTypes[selectedNode] || 'Unknown'}
+            dependencyGraph={dependencyGraph}
+            onNodeClick={onNodeClick}
+            onClose={() => setSelectedNode(null)}
+            panelSide={panelSide}
+            setPanelSide={setPanelSide}
+            legendMode={legendMode}
+          />
         )}
 
         <div className={`loom-floating-controls ${selectedNode ? 'panel-open' : ''} panel-${panelSide}`}> 

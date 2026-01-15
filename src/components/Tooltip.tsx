@@ -52,10 +52,10 @@ export function Tooltip({
 
       // Default calculation based on preference
       if (anchorDirection === 'right') {
-        x = rect.right + 15
+        x = rect.right + 10
         y = rect.top + rect.height / 2
       } else if (anchorDirection === 'left') {
-        x = rect.left - 15
+        x = rect.left - 10
         y = rect.top + rect.height / 2
       } else {
         x = rect.left + rect.width / 2
@@ -69,7 +69,7 @@ export function Tooltip({
         // Flip to left if space permits
         if (rect.left - estWidth > 0) {
           newPos = 'left'
-          x = rect.left - 15
+          x = rect.left - 10
         } else {
           // Clamp to edge
           x = viewportWidth - estWidth - 10
@@ -83,7 +83,7 @@ export function Tooltip({
         // Flip to right if space permits
         if (rect.right + estWidth < viewportWidth) {
           newPos = 'right'
-          x = rect.right + 15
+          x = rect.right + 10
         } else {
           x = 10
           newPos = 'below'

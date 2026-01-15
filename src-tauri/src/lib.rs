@@ -297,6 +297,10 @@ fn save_analysis_to_db(app_handle: &tauri::AppHandle, result: &AnalysisResult, p
 
     let mut conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
     
+    // SCHEMA GUARD: Ensure tables exist before operations
+    // This provides resilience if the tauri-plugin-sql migration hasn't finalized
+    conn.execute_batch(MIGRATION_0001).map_err(|e| format!("Database schema initialization failed: {}", e))?;
+
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     // Check if project exists, delete if so (overwrite)
@@ -685,17 +689,18 @@ pub fn run() {
       }
 
       // Splash: Shows CODEGNOSIS LOADING text only (image handled in main window's index.html)
+      // Updated with massive watermark "Know thy code." and fixed positioning
       let splash_html = "data:text/html;charset=utf-8,%3C!doctype%20html%3E%3Chtml%3E%3Chead%3E%3Cstyle%3E\
 *%7Bmargin:0;padding:0%7D\
 html,body%7Bwidth:100%25;height:100%25;background:%23000;font-family:system-ui,sans-serif;overflow:hidden%7D\
-.c%7Bposition:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem%7D\
-.t%7Bfont-size:2.5rem;font-weight:700;letter-spacing:0.3em;color:%23fff;text-shadow:0%200%2020px%20rgba(100,180,255,0.8)%7D\
-.l%7Bfont-size:0.9rem;letter-spacing:0.4em;color:rgba(150,200,255,0.7);animation:p%201.5s%20ease-in-out%20infinite%7D\
-.k%7Bfont-size:2.5rem;font-weight:700;letter-spacing:0.3em;color:%23fff;text-shadow:0%200%2020px%20rgba(100,180,255,0.8);animation:k%206s%20ease-in-out%20forwards%7D\
+.t%7Bposition:absolute;top:42%25;left:50%25;transform:translate(-50%25,-50%25);font-size:2.5rem;line-height:1;font-weight:700;letter-spacing:0.3em;color:%23fff;text-shadow:0%200%2020px%20rgba(100,180,255,0.8);z-index:2%7D\
+.l%7Bposition:absolute;top:55%25;left:50%25;transform:translate(-50%25,-50%25);font-size:0.9rem;letter-spacing:0.4em;color:rgba(150,200,255,0.7);animation:p%201.5s%20ease-in-out%20infinite;z-index:2%7D\
+.k%7Bposition:absolute;top:50%25;left:50%25;transform:translate(-50%25,-50%25);font-size:15vw;font-weight:900;color:%23fff;white-space:nowrap;z-index:1;letter-spacing:-0.05em;opacity:0;animation:k%205s%20ease-in-out%20forwards%7D\
 @keyframes%20p%7B0%25,100%25%7Bopacity:0.4%7D50%25%7Bopacity:1%7D%7D\
-@keyframes%20k%7B0%25%7Bopacity:0%7D50%25%7Bopacity:0.125%7D100%25%7Bopacity:0%7D%7D\
+@keyframes%20k%7B0%25%7Bopacity:0%7D40%25%7Bopacity:0.035%7D60%25%7Bopacity:0.035%7D100%25%7Bopacity:0%7D%7D\
 %3C/style%3E%3C/head%3E%3Cbody%3E\
-%3Cdiv%20class=%22c%22%3E%3Cdiv%20class=%22t%22%3ECODEGNOSIS%3C/div%3E%3Cdiv%20class=%22l%22%3ELOADING%3C/div%3E%3Cdiv%20class=%22k%22%3EKnow%20thy%20code.%3C/div%3E%3C/div%3E\
+%3Cdiv%20class=%22k%22%3EKnow%20thy%20code.%3C/div%3E\
+%3Cdiv%20class=%22t%22%3ECODEGNOSIS%3C/div%3E%3Cdiv%20class=%22l%22%3ELOADING%3C/div%3E\
 %3C/body%3E%3C/html%3E";
 
       let _splash = WebviewWindowBuilder::new(

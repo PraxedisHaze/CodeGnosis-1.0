@@ -45,26 +45,79 @@
         position: absolute;
         inset: 0;
         z-index: 2;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1.5rem;
+        /* Removed flex center to allow absolute positioning match */
         transition: opacity 0.3s ease-out;
       }
 
       #splash-title {
+        position: absolute;
+        top: 42%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         font-size: 2.5rem;
+        line-height: 1;
         font-weight: 700;
         letter-spacing: 0.3em;
         color: #fff;
         text-shadow: 0 0 20px rgba(100, 180, 255, 0.8), 0 0 40px rgba(0,0,0,0.9);
+        z-index: 2;
+        width: 100%;
+        text-align: center;
+      }
+
+      #splash-watermark {
+        position: absolute;
+        top: calc(50% - 23px);
+        left: 50%;
+        transform: translate(-50%, -27%);
+        font-size: 6vw;
+        font-weight: 900;
+        color: rgba(255, 255, 255, 0.035);
+        z-index: 1;
+        white-space: nowrap;
+        pointer-events: none;
+        letter-spacing: -0.05em;
+      }
+
+      .splash-label {
+        position: absolute;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.035);
+        letter-spacing: 0.2em;
+        pointer-events: none;
+        text-transform: uppercase;
+        opacity: 0;
+        animation: slideUp 1.5s ease-out 2s forwards;
+      }
+
+      @keyframes slideUp {
+        0% { opacity: 0; transform: translateY(100px) translateX(var(--tx, 0)); }
+        100% { opacity: 1; transform: translateY(0) translateX(var(--tx, 0)); }
+      }
+
+      #label-terran {
+        top: 7%;
+        right: 10%;
+        font-size: 4.8rem;
+        --tx: 0;
+      }
+
+      #label-aletheari {
+        top: 22%;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        font-size: 6.0rem;
+        --tx: 0;
       }
 
       /* === HEARTBEAT LINE SYSTEM === */
       #heartbeat-container {
-        position: relative;
-        width: 300px;
+        position: absolute;
+        top: 60%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80vw;
         height: 20px;
         display: flex;
         align-items: center;
@@ -75,14 +128,17 @@
       #heartbeat-line {
         position: absolute;
         height: 2px;
-        background: #4ade80;
-        width: 0;
-        animation: lineGrow 0.8s ease-out forwards;
+        background: linear-gradient(90deg, transparent, #4ade80 20%, #4ade80 80%, transparent);
+        width: 100%;
+        transform: scaleX(0);
+        transform-origin: center;
+        animation: lineGrow 2.0s ease-out forwards;
       }
 
       @keyframes lineGrow {
-        0% { width: 0; }
-        100% { width: 100%; }
+        0% { transform: scaleX(0); opacity: 0; }
+        10% { opacity: 1; }
+        100% { transform: scaleX(1); opacity: 1; }
       }
 
       /* Center flash - supernova burst */
@@ -93,7 +149,7 @@
         background: #fff;
         border-radius: 50%;
         opacity: 0;
-        animation: centerFlash 0.3s ease-out 0.8s forwards;
+        animation: centerFlash 0.3s ease-out 2.0s forwards;
       }
 
       @keyframes centerFlash {
@@ -119,14 +175,16 @@
         position: absolute;
         height: 2px;
         background: transparent;
-        width: 0;
+        width: 100%;
+        transform: scaleX(0);
+        transform-origin: center;
         box-shadow: 0 0 8px #4ade80, 0 0 16px #4ade80, 0 0 24px #22c55e;
-        animation: glowSpread 0.8s ease-out 1.1s forwards;
+        animation: glowSpread 2.0s ease-out 2.3s forwards;
       }
 
       @keyframes glowSpread {
-        0% { width: 0; }
-        100% { width: 100%; }
+        0% { transform: scaleX(0); }
+        100% { transform: scaleX(1); }
       }
 
       /* Second flash + glow cycle (cyan) */
@@ -137,7 +195,7 @@
         background: #fff;
         border-radius: 50%;
         opacity: 0;
-        animation: centerFlash2 0.3s ease-out 1.9s forwards;
+        animation: centerFlash2 0.3s ease-out 3.1s forwards;
       }
 
       @keyframes centerFlash2 {
@@ -162,9 +220,11 @@
         position: absolute;
         height: 2px;
         background: transparent;
-        width: 0;
+        width: 100%;
+        transform: scaleX(0);
+        transform-origin: center;
         box-shadow: 0 0 8px #22d3ee, 0 0 16px #22d3ee, 0 0 24px #0891b2;
-        animation: glowSpread 0.8s ease-out 2.2s forwards;
+        animation: glowSpread 2.0s ease-out 3.4s forwards;
       }
 
       /* Third flash + glow cycle (purple) */
@@ -175,7 +235,7 @@
         background: #fff;
         border-radius: 50%;
         opacity: 0;
-        animation: centerFlash3 0.3s ease-out 3s forwards;
+        animation: centerFlash3 0.3s ease-out 4.2s forwards;
       }
 
       @keyframes centerFlash3 {
@@ -200,9 +260,11 @@
         position: absolute;
         height: 2px;
         background: transparent;
-        width: 0;
+        width: 100%;
+        transform: scaleX(0);
+        transform-origin: center;
         box-shadow: 0 0 8px #a855f7, 0 0 16px #a855f7, 0 0 24px #7c3aed;
-        animation: glowSpread 0.8s ease-out 3.3s forwards, glowLoop 2.4s ease-out 4.1s infinite;
+        animation: glowSpread 2.0s ease-out 4.5s forwards, glowLoop 2.4s ease-out 5.3s infinite;
       }
 
       /* Loop animation - cycles through colors */
@@ -222,12 +284,16 @@
       }
 
       #splash-loading {
+        position: absolute;
+        top: 55%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         font-size: 0.9rem;
         letter-spacing: 0.4em;
         color: rgba(150, 200, 255, 0.7);
         animation: pulse 1.5s ease-in-out infinite;
         text-shadow: 0 0 10px rgba(0,0,0,0.9);
-        margin-top: 1rem;
+        margin-top: 0;
       }
       @keyframes pulse {
         0%, 100% { opacity: 0.4; }
@@ -254,6 +320,10 @@
 
       #launch-btn {
         display: none;
+        position: absolute;
+        top: 75%;
+        left: 50%;
+        transform: translateX(-50%);
         font-size: 1.1rem;
         font-weight: 600;
         letter-spacing: 0.3em;
@@ -267,12 +337,12 @@
         box-shadow: 0 0 30px rgba(100, 180, 255, 0.3), 0 0 60px rgba(0,0,0,0.8);
         transition: all 0.3s ease;
         animation: glowPulse 2s ease-in-out infinite;
-        margin-top: 1rem;
+        margin-top: 0;
       }
       #launch-btn:hover {
         background: linear-gradient(135deg, rgba(100, 180, 255, 0.5), rgba(100, 180, 255, 0.2));
         border-color: rgba(100, 180, 255, 0.9);
-        transform: scale(1.05);
+        transform: translateX(-50%) scale(1.05);
       }
       @keyframes glowPulse {
         0%, 100% { box-shadow: 0 0 30px rgba(100, 180, 255, 0.3), 0 0 60px rgba(0,0,0,0.8); }
@@ -302,6 +372,9 @@
 
       <!-- Text overlay -->
       <div id="splash-text">
+        <div id="splash-watermark">Know thy code.</div>
+        <div id="label-terran" class="splash-label">Terran</div>
+        <div id="label-aletheari" class="splash-label">Aleth&eacute;ari</div>
         <div id="splash-title">CODEGNOSIS</div>
 
         <!-- Heartbeat line system -->
