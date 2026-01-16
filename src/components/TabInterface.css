@@ -1,89 +1,142 @@
-.tab-container {
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAB SYSTEM - Horizontal tabs at top corner, side-sliding drawers
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tab-system {
+  position: absolute;
+  top: 8px;
+  z-index: 400;
   display: flex;
   flex-direction: column;
-  position: absolute;
-  top: 120px; /* Offset from top */
-  gap: 12px;
-  background: transparent;
-  border: none;
-  z-index: 400; /* Above content shield */
+  align-items: flex-start;
+  pointer-events: none;
+  transition: left 0.3s ease, right 0.3s ease;
 }
 
-/* Sidebar on Left -> Tabs on Left edge of Main Content */
-.tab-container.side-left {
-  left: 0;
+.tab-system.side-left {
+  left: 8px;
+  right: auto;
 }
 
-/* Sidebar on Right -> Tabs on Right edge of Main Content */
-.tab-container.side-right {
-  right: 0;
+.tab-system.side-right {
+  left: auto;
+  right: 8px;
+  align-items: flex-end;
 }
 
-.tab-button {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  transform: rotate(0deg); 
-  padding: 1.5rem 0.6rem;
-  background: rgba(15, 20, 35, 0.95);
-  backdrop-filter: blur(8px);
+/* ─────────────────────────────────────────────────────────────────────────────
+   HYDRAULIC RAIL - Horizontal bar across top
+   ───────────────────────────────────────────────────────────────────────────── */
+.hydraulic-rail {
+  height: 8px;
+  background: linear-gradient(180deg,
+    #4a4a5a 0%,
+    #2a2a3a 40%,
+    #1a1a2a 60%,
+    #3a3a4a 100%
+  );
   border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+  padding: 0 8px;
+}
+
+/* Hydraulic streaks */
+.hydraulic-rail::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.5) 30%,
+    rgba(0, 0, 0, 0.3) 70%,
+    transparent 100%
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TAB CONTAINER - Horizontal row of tabs
+   ───────────────────────────────────────────────────────────────────────────── */
+.tab-container {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  background: transparent;
+  pointer-events: auto;
+  margin-top: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TAB BUTTONS - Horizontal tabs, pull-down style
+   ───────────────────────────────────────────────────────────────────────────── */
+.tab-button {
+  padding: 0.6rem 1.2rem;
+  background: rgba(20, 25, 40, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: none;
   color: #8892b0;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  
-  /* Mechanical Tab Shape */
-  border-radius: 0 6px 6px 0; /* Default Left-side attachment */
-  border-left: none;
-  
+  position: relative;
+
+  /* Pull-tab shape - rounded bottom */
+  border-radius: 0 0 8px 8px;
+
   /* Depth */
-  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
   transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  
-  min-height: 100px;
+
   display: flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
 }
 
-/* Right side variant */
-.tab-container.side-right .tab-button {
-  border-radius: 6px 0 0 6px;
-  border-right: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: -4px 4px 10px rgba(0, 0, 0, 0.5);
+/* Pull handle - the little grip at top */
+.tab-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 3px;
+  background: rgba(100, 100, 120, 0.6);
+  border-radius: 0 0 2px 2px;
 }
 
 .tab-button:hover {
-  background: rgba(30, 40, 60, 1);
+  background: rgba(30, 40, 60, 0.98);
   color: #fff;
-  transform: rotate(0deg) translateX(-2px);
-}
-
-.tab-container.side-right .tab-button:hover {
-  transform: rotate(0deg) translateX(2px);
+  transform: translateY(2px);
+  border-color: rgba(0, 212, 255, 0.3);
 }
 
 .tab-button.active {
-  background: #00d4ff;
+  background: linear-gradient(180deg, #00a8cc 0%, #007799 100%);
   color: #000;
   border-color: #00d4ff;
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
-  z-index: 10;
+  box-shadow:
+    0 6px 20px rgba(0, 212, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(4px);
 }
 
-/* Active state pop-out */
-.tab-container.side-left .tab-button.active {
-  transform: rotate(0deg) translateX(-6px);
-  border-radius: 0 8px 8px 0;
-}
-
-.tab-container.side-right .tab-button.active {
-  transform: rotate(0deg) translateX(6px);
-  border-radius: 8px 0 0 8px;
+.tab-button.active::before {
+  background: rgba(0, 212, 255, 0.8);
+  box-shadow: 0 0 6px rgba(0, 212, 255, 0.5);
 }
 
 .tab-indicator {

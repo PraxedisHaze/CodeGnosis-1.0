@@ -240,19 +240,39 @@
 }
 
 /* Results / City Hall / Vault - centered overlay */
-.drawer-panel .results, 
-.drawer-panel .construct-hall, 
+.drawer-panel .results,
+.drawer-panel .construct-hall,
 .drawer-panel .vault-hall,
 .drawer-panel .analysis-report {
   flex: 1;
+  min-height: 0; /* Critical for flex child scrolling */
   background: transparent;
   border: none;
   border-radius: 0;
-  padding: 2rem;
+  padding: 1.5rem;
   overflow-y: auto;
+  overflow-x: hidden;
   margin-top: 0;
   width: 100%;
-  height: 100%;
+
+  /* Scrollbar styling for inner content */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 100, 120, 0.5) transparent;
+}
+
+.drawer-panel .results::-webkit-scrollbar,
+.drawer-panel .construct-hall::-webkit-scrollbar,
+.drawer-panel .vault-hall::-webkit-scrollbar,
+.drawer-panel .analysis-report::-webkit-scrollbar {
+  width: 6px;
+}
+
+.drawer-panel .results::-webkit-scrollbar-thumb,
+.drawer-panel .construct-hall::-webkit-scrollbar-thumb,
+.drawer-panel .vault-hall::-webkit-scrollbar-thumb,
+.drawer-panel .analysis-report::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 120, 0.4);
+  border-radius: 3px;
 }
 
 /* --- LAYERED DRAWERS --- */
@@ -268,21 +288,26 @@
 
 .drawer-panel {
   position: absolute;
-  top: 8px;
-  bottom: 70px; /* Leave room for floating controls */
-  left: 60px; /* Clear the vertical tabs */
-  width: 333px;
+  top: 50px; /* Below the tab bar */
+  bottom: 70px; /* Above floating controls */
+  left: 0;
+  width: 380px;
   max-width: 90vw;
   background: rgba(10, 12, 18, 0.95);
   backdrop-filter: blur(12px);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: none;
   box-shadow: 10px 0 40px rgba(0, 0, 0, 0.8);
-  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0s linear 0.4s;
   pointer-events: auto;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  border-radius: 0 0 12px 0;
+  border-radius: 0 12px 12px 0;
+  z-index: 350; /* Above galaxy (1), below tabs (400) */
+
+  /* Outer panel doesn't scroll - inner content does */
+  overflow: hidden;
 }
 
 .drawer-panel.closed {
@@ -300,17 +325,22 @@
   max-width: 95vw;
 }
 
+/* When sidebar (and tabs) are on the right, drawers slide from right */
 .sidebar-right .drawer-panel {
   left: auto;
   right: 0;
-  border-right: none;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: none;
+  border-radius: 12px 0 0 12px;
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.8);
 }
 
 .sidebar-right .drawer-panel.closed {
   transform: translateX(100%);
-  visibility: hidden;
-  pointer-events: none;
+}
+
+.sidebar-right .drawer-panel.open {
+  transform: translateX(0);
 }
 
 /* Tabs */

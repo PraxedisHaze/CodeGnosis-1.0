@@ -259,6 +259,103 @@ function calculateFormationPosition(filePath: string, category: string, allFileP
   return { x: x + (col - 2.5) * 12 * spacingScale, y: y, z: z }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// THE SPECIES VIEWS - Terran (City) vs Anothen (Well)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * TERRAN VIEW (The City) - Code builds UPWARD from foundation
+ * Z+ = Height = Folder depth + Layer
+ * Structure: Rigid, Grid-based, Manhattan layout
+ */
+function calculateTerranPosition(
+  filePath: string,
+  category: string,
+  allFilePaths: string[],
+  fileTypesMap: Record<string, string>,
+  fileMetadata: Record<string, any>,
+  spacingScale: number = 1.0
+): { x: number, y: number, z: number } {
+  const family = getCategoryFamily(category)
+
+  // X: Tech-stack columns (like city districts)
+  const districtOffsets: Record<string, number> = {
+    'Logic': -120, 'UI': -60, 'Data': 0, 'Config': 60, 'Assets': 120, 'Docs': 180, 'Unknown': 240, 'External': 300
+  }
+
+  // Calculate grid position within district
+  const sameTypeFiles = allFilePaths
+    .filter(f => getCategoryFamily(fileTypesMap[f] || 'Unknown') === family)
+    .sort((a, b) => a.localeCompare(b))
+  const idx = sameTypeFiles.indexOf(filePath)
+  const gridCols = 5
+  const row = Math.floor(idx / gridCols)
+  const col = idx % gridCols
+
+  const x = (districtOffsets[family] ?? 240) * spacingScale + (col - 2) * 25 * spacingScale
+
+  // Y: Spread within the grid row
+  const y = (row * 25 - 50) * spacingScale
+
+  // Z (HEIGHT): Folder depth - deeper folders rise higher (building floors)
+  const pathParts = filePath.replace(/\//g, '\\').split('\\')
+  const folderDepth = pathParts.length - 1
+  const layerBonus = family === 'UI' ? 20 : family === 'Logic' ? 10 : 0
+  const z = (folderDepth * 50 + layerBonus) * spacingScale  // POSITIVE Z = UP
+
+  return { x, y, z }
+}
+
+/**
+ * ANOTHEN VIEW (The Well) - Code sinks INTO meaning
+ * Z- = Depth = Semantic Gravity (Inbound connections)
+ * Structure: Organic, Force-directed, Star/Cellular
+ */
+function calculateAnothenPosition(
+  filePath: string,
+  category: string,
+  idx: number,
+  total: number,
+  fileMetadata: Record<string, any>,
+  spacingScale: number = 1.0
+): { x: number, y: number, z: number } {
+  const family = getCategoryFamily(category)
+  const meta = fileMetadata[filePath] || {}
+  const inboundCount = meta.inboundCount || 0
+
+  // Radial distribution based on Intent (family)
+  const familyAngles: Record<string, number> = {
+    'Logic': 0,                    // The Sovereign - center front
+    'UI': Math.PI * 0.4,           // The Mirror - upper right
+    'Data': Math.PI,               // The Ground - back center
+    'Config': Math.PI * 1.4,       // The Braid - lower right
+    'Assets': Math.PI * 1.7,       // Resources - lower left
+    'Docs': Math.PI * 0.7,         // Knowledge - upper left
+    'Unknown': Math.PI * 1.2,      // Mystery - back left
+    'External': Math.PI * 2        // Outside - outer ring
+  }
+
+  // Organic spread with seed-based jitter
+  const seed = hashString(filePath)
+  const jitter = (Math.sin(seed) * 10000 - Math.floor(Math.sin(seed) * 10000) - 0.5) * 0.25
+  const baseAngle = familyAngles[family] || Math.PI
+  const angle = baseAngle + jitter
+
+  // Radial distance: lighter files orbit further out
+  const gravityFactor = Math.min(inboundCount, 20) / 20  // Normalize 0-1
+  const baseRadius = 150 - gravityFactor * 100  // Heavy = closer to center
+  const orbitRadius = baseRadius + (idx / Math.max(1, total)) * 50
+
+  const x = Math.cos(angle) * orbitRadius * spacingScale
+  const y = Math.sin(angle) * orbitRadius * spacingScale
+
+  // Z (DEPTH): Semantic Gravity - more inbound = deeper sink
+  // Surface (z=0) = leaf nodes, Abyss (z=-500) = core hubs
+  const z = -(inboundCount * 20) * spacingScale  // NEGATIVE Z = DOWN
+
+  return { x, y, z }
+}
+
 function createSkyboxTexture(topColor: string, bottomColor: string, horizonColor: string, isTop: boolean, isSide: boolean): THREE.CanvasTexture {
   const size = 512
   const canvas = document.createElement('canvas')
@@ -910,7 +1007,97 @@ export function LoomGraph({
       }
     }, 100)
     return () => { clearInterval(initStarfield); if (twinkleAnimationRef.current) cancelAnimationFrame(twinkleAnimationRef.current) }
-  }, []) 
+  }, [])
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // BATHYMETRIC GRIDS - Depth reference planes for the Anothen Well
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const bathymetricRef = useRef<THREE.Group | null>(null)
+
+  useEffect(() => {
+    if (!fgRef.current) return
+    const fg = fgRef.current
+    const scene = fg.scene()
+    if (!scene) return
+
+    // Remove existing bathymetric group if present
+    if (bathymetricRef.current) {
+      scene.remove(bathymetricRef.current)
+      bathymetricRef.current = null
+    }
+
+    // Only show grids in Anothen (Intent) mode during Formation
+    if (legendMode !== 'intent' || !isFormationMode) return
+
+    const bathyGroup = new THREE.Group()
+    bathyGroup.name = 'bathymetric-grids'
+
+    // Define depth layers: Surface, Twilight, Abyss
+    const depthLayers = [
+      { z: 0, label: 'Surface', color: 0x00d4ff, opacity: 0.15 },
+      { z: -100, label: 'Shallow', color: 0x00a0cc, opacity: 0.12 },
+      { z: -200, label: 'Twilight', color: 0x9966cc, opacity: 0.10 },
+      { z: -300, label: 'Deep', color: 0xff6600, opacity: 0.08 },
+      { z: -400, label: 'Abyss', color: 0xff3300, opacity: 0.06 },
+    ]
+
+    depthLayers.forEach(layer => {
+      // Create circular grid plane
+      const ringGeo = new THREE.RingGeometry(20, 250, 64)
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: layer.color,
+        transparent: true,
+        opacity: layer.opacity,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      })
+      const ring = new THREE.Mesh(ringGeo, ringMat)
+      ring.rotation.x = -Math.PI / 2 // Horizontal plane
+      ring.position.z = layer.z
+      ring.name = `depth-ring-${layer.label.toLowerCase()}`
+      bathyGroup.add(ring)
+
+      // Add concentric rings for depth reference
+      for (let r = 50; r <= 200; r += 50) {
+        const circleGeo = new THREE.RingGeometry(r - 1, r + 1, 64)
+        const circleMat = new THREE.MeshBasicMaterial({
+          color: layer.color,
+          transparent: true,
+          opacity: layer.opacity * 0.5,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+        const circle = new THREE.Mesh(circleGeo, circleMat)
+        circle.rotation.x = -Math.PI / 2
+        circle.position.z = layer.z
+        bathyGroup.add(circle)
+      }
+
+      // Add glow effect at each depth
+      const glowGeo = new THREE.CircleGeometry(15, 32)
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: layer.color,
+        transparent: true,
+        opacity: layer.opacity * 2,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      })
+      const glow = new THREE.Mesh(glowGeo, glowMat)
+      glow.rotation.x = -Math.PI / 2
+      glow.position.z = layer.z
+      bathyGroup.add(glow)
+    })
+
+    scene.add(bathyGroup)
+    bathymetricRef.current = bathyGroup
+
+    return () => {
+      if (bathymetricRef.current && scene) {
+        scene.remove(bathymetricRef.current)
+        bathymetricRef.current = null
+      }
+    }
+  }, [legendMode, isFormationMode])
 
   // Track previous mission to detect mission changes (not manual Formation toggle)
   const prevMissionRef = useRef<string | null>(null)
@@ -944,6 +1131,7 @@ export function LoomGraph({
   }, [starSize, soloFamily, activeMission, useShapes])
 
   // Update charge force when slider changes (Galaxy) OR Tightness (Formation)
+  // Also handles Species View transitions (Terran/Anothen) based on legendMode
   useEffect(() => {
     if (!fgRef.current) return;
     if (isFormationMode) {
@@ -951,28 +1139,67 @@ export function LoomGraph({
       const spacingMultiplier = Math.abs(chargeStrength) / 40;
       const graphNodes = filteredGraphData.nodes;
       const allFilePaths = graphNodes.map((n: GraphNode) => n.id);
-      
+      const familyCounts: Record<string, number> = {}
+
       graphNodes.forEach((node: any) => {
         if (node.category === 'Label') {
            const fam = node.id.replace('__LABEL_', '');
-           const typeOffsets: Record<string, number> = { 'Logic': -150, 'UI': -75, 'Data': 0, 'Config': 75, 'Assets': 150, 'Docs': 225, 'External': 375 };
-           node.fx = (typeOffsets[fam] ?? 300) * spacingMultiplier;
-           node.x = node.fx;
+           // Position labels based on view mode
+           if (legendMode === 'tech') {
+             // Terran: City districts layout
+             const districtOffsets: Record<string, number> = { 'Logic': -120, 'UI': -60, 'Data': 0, 'Config': 60, 'Assets': 120, 'Docs': 180, 'External': 300 };
+             node.fx = (districtOffsets[fam] ?? 240) * spacingMultiplier;
+             node.fy = -80 * spacingMultiplier; // Labels above the city
+             node.fz = 0;
+           } else {
+             // Anothen: Radial labels around the well
+             const familyAngles: Record<string, number> = { 'Logic': 0, 'UI': Math.PI * 0.4, 'Data': Math.PI, 'Config': Math.PI * 1.4, 'Assets': Math.PI * 1.7, 'Docs': Math.PI * 0.7, 'External': Math.PI * 2 };
+             const angle = familyAngles[fam] || Math.PI;
+             const labelRadius = 180 * spacingMultiplier;
+             node.fx = Math.cos(angle) * labelRadius;
+             node.fy = Math.sin(angle) * labelRadius;
+             node.fz = 50; // Labels float above the well
+           }
+           node.x = node.fx; node.y = node.fy; node.z = node.fz;
            return;
         }
-        const pos = calculateFormationPosition(node.id, node.category || 'Unknown', allFilePaths, fileTypes, spacingMultiplier);
-        const lift = isBrokenFile(node.id) ? 120 : 0;
+
+        // Count nodes per family for Anothen index calculation
+        const family = getCategoryFamily(node.category || 'Unknown')
+        familyCounts[family] = (familyCounts[family] || 0) + 1
+        const idxInFamily = familyCounts[family] - 1
+        const totalInFamily = graphNodes.filter((n: GraphNode) => getCategoryFamily(n.category || 'Unknown') === family && !n.id.startsWith('__LABEL_')).length
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // THE SPECIES FLIP: Terran (City) vs Anothen (Well)
+        // ═══════════════════════════════════════════════════════════════════════
+        let pos: { x: number, y: number, z: number }
+
+        if (legendMode === 'tech') {
+          // TERRAN VIEW: The City rises UPWARD
+          pos = calculateTerranPosition(node.id, node.category || 'Unknown', allFilePaths, fileTypes, allFiles, spacingMultiplier);
+        } else {
+          // ANOTHEN VIEW: The Well sinks DOWNWARD
+          pos = calculateAnothenPosition(node.id, node.category || 'Unknown', idxInFamily, totalInFamily, allFiles, spacingMultiplier);
+        }
+
+        const lift = isBrokenFile(node.id) ? (legendMode === 'tech' ? 50 : -50) : 0; // Broken files lift in city, sink further in well
         node.fx = pos.x;
-        node.fy = pos.y + lift;
-        node.fz = pos.z;
+        node.fy = pos.y;
+        node.fz = pos.z + lift;
         node.x = node.fx; node.y = node.fy; node.z = node.fz;
       });
       fgRef.current.refresh();
-    } else {
-      fgRef.current.d3Force('charge', forceManyBody().strength(chargeStrength))
-      fgRef.current.d3Force('center', forceCenter().strength(0.6)) // Anchor the Big Bang
-      fgRef.current.d3ReheatSimulation()
     }
+    // Note: Galaxy mode (non-formation) force updates are handled separately below
+  }, [chargeStrength, isFormationMode, legendMode, allFiles])
+
+  // Separate effect for galaxy mode charge updates - only reheats when charge changes, NOT legendMode
+  useEffect(() => {
+    if (!fgRef.current || isFormationMode) return;
+    fgRef.current.d3Force('charge', forceManyBody().strength(chargeStrength))
+    fgRef.current.d3Force('center', forceCenter().strength(0.6))
+    fgRef.current.d3ReheatSimulation()
   }, [chargeStrength, isFormationMode])
 
   /*
@@ -1049,9 +1276,36 @@ export function LoomGraph({
     let tScale = 1.0, tOpacity = 1.0, tColor: string | null = null
     const missP = missionProgressRef.current
 
-    // Apply color based on mode
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SPECIES COLOR LOGIC: Terran (Tech colors) vs Anothen (Depth/Heat colors)
+    // ═══════════════════════════════════════════════════════════════════════════
     if (legendMode === 'tech') {
+      // TERRAN: Tech-stack colors (neon, cold data)
       tColor = getTechColor(node.category)
+    } else {
+      // ANOTHEN: Depth-based molten core gradient
+      // Surface (z=0) = Cool cyan, Abyss (z=-400+) = Hot molten orange/yellow
+      const meta = allFiles[node.id] || {}
+      const inboundCount = meta.inboundCount || 0
+      const depth = Math.min(inboundCount * 20, 400) // Max depth 400
+      const depthRatio = depth / 400 // 0 = surface, 1 = core
+
+      // Color gradient: Cyan (#00d4ff) -> Purple (#9966cc) -> Orange (#ff6600) -> Yellow (#ffcc00)
+      if (depthRatio < 0.25) {
+        // Surface: Cyan to Light Purple
+        tColor = depthRatio < 0.1 ? '#00d4ff' : '#66aadd'
+      } else if (depthRatio < 0.5) {
+        // Shallow: Purple tones
+        tColor = '#9966cc'
+      } else if (depthRatio < 0.75) {
+        // Deep: Orange/Red heat
+        tColor = '#ff6600'
+      } else {
+        // Abyss/Core: Molten yellow-gold (pulsing)
+        const pulse = 0.8 + Math.sin(Date.now() / 500) * 0.2
+        tScale = 1.2 * pulse // Core nodes pulse larger
+        tColor = '#ffcc00'
+      }
     }
 
     // PRIORITY 1: Solo Family Highlight (Legend) - Soft Filter

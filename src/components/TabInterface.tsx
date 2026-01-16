@@ -19,24 +19,42 @@ const TABS: { key: TabKey; label: string; tooltipKey: keyof typeof tooltips.tabs
   { key: 'vault', label: 'Vault of Value', tooltipKey: 'vault' }
 ]
 
+// Drawer widths for positioning tabs at drawer edge
+const DRAWER_WIDTHS: Record<TabKey, number> = {
+  controls: 333,
+  analysis: 333,
+  codeCity: 333,
+  vault: 800,
+  graph: 333
+}
+
 export function TabInterface({ openDrawers, onToggleDrawer, tooltipLevel, sidebarPosition }: TabInterfaceProps) {
+  const hasOpenDrawer = openDrawers.length > 0
+  const drawerState = hasOpenDrawer ? 'drawer-open' : 'drawer-closed'
+
   return (
-    <div className={`tab-container side-${sidebarPosition}`}>
-      {TABS.map((tab) => (
-        <Tooltip 
-          key={tab.key} 
-          content={getTooltip(tooltips.tabs[tab.tooltipKey], tooltipLevel)}
-          anchored={true}
-          anchorDirection="right"
-        >
-          <button
-            className={`tab-button ${openDrawers.includes(tab.key) ? 'active' : ''}`}
-            onClick={() => onToggleDrawer(tab.key)}
+    <div className={`tab-system side-${sidebarPosition} ${drawerState}`}>
+      {/* Hydraulic Rail - Horizontal bar at top */}
+      <div className="hydraulic-rail" />
+
+      {/* Tab Buttons - Horizontal row */}
+      <div className="tab-container">
+        {TABS.map((tab) => (
+          <Tooltip
+            key={tab.key}
+            content={getTooltip(tooltips.tabs[tab.tooltipKey], tooltipLevel)}
+            anchored={true}
+            anchorDirection="bottom"
           >
-            {tab.label}
-          </button>
-        </Tooltip>
-      ))}
+            <button
+              className={`tab-button ${openDrawers.includes(tab.key) ? 'active' : ''}`}
+              onClick={() => onToggleDrawer(tab.key)}
+            >
+              {tab.label}
+            </button>
+          </Tooltip>
+        ))}
+      </div>
     </div>
   )
 }
