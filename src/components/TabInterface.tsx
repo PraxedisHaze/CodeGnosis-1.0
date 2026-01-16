@@ -16,7 +16,8 @@ const TABS: { key: TabKey; label: string; tooltipKey: keyof typeof tooltips.tabs
   { key: 'controls', label: 'Calibration', tooltipKey: 'graph' },
   { key: 'analysis', label: 'Analysis Report', tooltipKey: 'analysis' },
   { key: 'codeCity', label: 'The Construct', tooltipKey: 'theConstruct' },
-  { key: 'vault', label: 'Vault of Value', tooltipKey: 'vault' }
+  { key: 'vault', label: 'Vault of Value', tooltipKey: 'vault' },
+  { key: 'graph', label: 'Export', tooltipKey: 'graph' }
 ]
 
 // Drawer widths for positioning tabs at drawer edge
@@ -38,22 +39,33 @@ export function TabInterface({ openDrawers, onToggleDrawer, tooltipLevel, sideba
       <div className="hydraulic-rail" />
 
       {/* Tab Buttons - Horizontal row */}
-      <div className="tab-container">
-        {TABS.map((tab) => (
-          <Tooltip
-            key={tab.key}
-            content={getTooltip(tooltips.tabs[tab.tooltipKey], tooltipLevel)}
-            anchored={true}
-            anchorDirection="bottom"
-          >
+      <div className="tab-row">
+        <div className="tab-container">
+          {TABS.map((tab) => (
             <button
+              key={tab.key}
               className={`tab-button ${openDrawers.includes(tab.key) ? 'active' : ''}`}
               onClick={() => onToggleDrawer(tab.key)}
             >
               {tab.label}
             </button>
-          </Tooltip>
-        ))}
+          ))}
+        </div>
+
+        <div className="tab-tooltips">
+          {TABS.map((tab) => (
+            <Tooltip
+              key={tab.key}
+              content={getTooltip(tooltips.tabs[tab.tooltipKey], tooltipLevel)}
+              anchored={true}
+              anchorDirection="right"
+            >
+              <div className="tab-tooltip-stack" aria-hidden="true">
+                {tab.label}
+              </div>
+            </Tooltip>
+          ))}
+        </div>
       </div>
     </div>
   )

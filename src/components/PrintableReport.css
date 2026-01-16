@@ -1,0 +1,430 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRINTABLE REPORT - Screen & Print Styles
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.printable-report {
+  padding: 1.5rem;
+  color: #e0e0e0;
+  min-height: 100%;
+  overflow-y: auto;
+}
+
+.printable-report.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CONTROLS (Hidden in print)
+   ───────────────────────────────────────────────────────────────────────────── */
+.report-controls {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.report-controls h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+}
+
+.report-controls p {
+  margin: 0 0 1.5rem 0;
+  color: #888;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.control-buttons button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-generate {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+}
+
+.btn-generate:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-generate:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.btn-print {
+  background: #27AE60;
+  border: none;
+  color: white;
+}
+
+.btn-print:hover {
+  background: #2ECC71;
+}
+
+.btn-copy {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #e0e0e0;
+}
+
+.btn-copy:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   REPORT CONTENT
+   ───────────────────────────────────────────────────────────────────────────── */
+.report-content {
+  background: #0d1117;
+  border-radius: 8px;
+  padding: 2rem;
+}
+
+.report-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+.report-header h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 2rem;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.report-meta {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.project-name {
+  font-weight: 600;
+  color: #aaa;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   STATS BAR
+   ───────────────────────────────────────────────────────────────────────────── */
+.report-stats {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.stat-box {
+  text-align: center;
+}
+
+.stat-box .stat-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.stat-box .stat-label {
+  font-size: 0.8rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DUAL VIEW SECTION
+   ───────────────────────────────────────────────────────────────────────────── */
+.dual-view-section {
+  margin-bottom: 2rem;
+}
+
+.dual-view-section h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.3rem;
+  color: #ccc;
+}
+
+.dual-views {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.view-panel {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.view-panel h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+}
+
+.view-panel .view-desc {
+  margin: 0 0 1rem 0;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.view-snapshot {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.view-placeholder {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  color: #555;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   MISSION INTELLIGENCE
+   ───────────────────────────────────────────────────────────────────────────── */
+.mission-intelligence h2 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.3rem;
+  color: #ccc;
+}
+
+.mission-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  page-break-inside: avoid;
+}
+
+.mission-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.mission-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.mission-subtitle {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.mission-description {
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
+  color: #999;
+}
+
+.mission-files table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.mission-files th {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #888;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.mission-files td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mission-files .file-path {
+  font-family: 'JetBrains Mono', monospace;
+  color: #aaa;
+  word-break: break-all;
+}
+
+.mission-files .file-path.secondary {
+  color: #E74C3C;
+}
+
+.mission-files .metric {
+  text-align: center;
+  color: #667eea;
+  font-weight: 600;
+}
+
+.file-count {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #666;
+  text-align: right;
+}
+
+.no-issues {
+  color: #27AE60;
+  font-size: 0.9rem;
+}
+
+.cycle-count {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(231, 76, 60, 0.1);
+  border-radius: 4px;
+  color: #E74C3C;
+  font-size: 0.85rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   FOOTER
+   ───────────────────────────────────────────────────────────────────────────── */
+.report-footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.report-footer p {
+  margin: 0.25rem 0;
+}
+
+.report-path {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: #555;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRINT STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .printable-report {
+    padding: 0;
+    color: #000;
+    background: #fff;
+  }
+
+  .report-content {
+    background: #fff;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  .report-header h1 {
+    background: none;
+    -webkit-text-fill-color: #333;
+    color: #333;
+  }
+
+  .report-meta,
+  .report-meta .project-name {
+    color: #666;
+  }
+
+  .report-stats {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+  }
+
+  .stat-box .stat-value {
+    color: #333;
+  }
+
+  .stat-box .stat-label {
+    color: #666;
+  }
+
+  .view-panel {
+    background: #f9f9f9;
+    border-color: #ddd;
+  }
+
+  .view-panel h3 {
+    color: #333;
+  }
+
+  .mission-section {
+    background: #fafafa;
+    border-color: #ddd;
+  }
+
+  .mission-header h3 {
+    color: #333;
+  }
+
+  .mission-description {
+    color: #666;
+  }
+
+  .mission-files th {
+    color: #333;
+    border-bottom-color: #ccc;
+  }
+
+  .mission-files td {
+    border-bottom-color: #eee;
+  }
+
+  .mission-files .file-path {
+    color: #333;
+  }
+
+  .mission-files .metric {
+    color: #667eea;
+  }
+
+  .report-footer {
+    border-top-color: #ddd;
+    color: #888;
+  }
+
+  /* Page breaks */
+  .dual-view-section {
+    page-break-after: always;
+  }
+
+  .mission-section {
+    page-break-inside: avoid;
+  }
+}

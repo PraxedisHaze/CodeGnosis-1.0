@@ -268,7 +268,11 @@ def load_codegnosis_config(project_path):
                 "target",
             ],
             "files": ["package-lock.json", ".DS_Store"],
-            "extensions": [".exe", ".dll", ".pyc", ".png", ".jpg", ".zip"],
+            "extensions": [
+                ".exe", ".dll", ".pyc", ".png", ".jpg", ".jpeg", ".gif", ".webp",
+                ".zip", ".tar", ".gz", ".7z", ".rar",
+                ".xcf", ".psd", ".ai", ".sketch", ".fig", ".blend", ".fbx"
+            ],
         },
         "analysisSettings": {
             "fileSizeLimitMB": 5,

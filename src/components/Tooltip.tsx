@@ -33,6 +33,7 @@ export function Tooltip({
   const [coords, setCoords] = useState({ x: 0, y: 0 })
   const triggerRef = useRef<HTMLDivElement>(null)
   const hideTimer = useRef<number | null>(null)
+  const showTimer = useRef<number | null>(null)
 
   const updatePosition = useCallback((e?: React.MouseEvent) => {
     const viewportWidth = window.innerWidth
@@ -137,8 +138,17 @@ export function Tooltip({
       hideTimer.current = null
     }
     if (isPinned) return
-    updatePosition(e)
-    setVisible(true)
+    
+    // Capture position now, show later
+    const clientX = e.clientX
+    const clientY = e.clientY
+    
+    showTimer.current = window.setTimeout(() => {
+      // Manually trigger position update with captured coords
+      const mockEvent = { clientX, clientY } as React.MouseEvent
+      updatePosition(mockEvent)
+      setVisible(true)
+    }, 1000)
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -148,6 +158,10 @@ export function Tooltip({
   }
 
   const handleMouseLeave = () => {
+    if (showTimer.current) {
+      clearTimeout(showTimer.current)
+      showTimer.current = null
+    }
     if (!isPinned) {
       // Small delay to allow bridging the gap to the tooltip
       hideTimer.current = window.setTimeout(() => {

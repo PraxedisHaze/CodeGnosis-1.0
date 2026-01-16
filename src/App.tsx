@@ -18,6 +18,7 @@ import { LoomControlPanel } from './components/LoomControlPanel'
 import { TheConstruct } from './components/TheConstruct'
 import { VaultOfValue } from './components/VaultOfValue'
 import { AnalysisReport } from './components/AnalysisReport'
+import { PrintableReport } from './components/PrintableReport'
 import { Tooltip } from './components/Tooltip'
 import { tooltips, getTooltip, VerbosityLevel } from './components/TooltipContent'
 import './App.css'
@@ -379,7 +380,7 @@ function App() {
 
             <div className={`drawer-panel ${openDrawers.includes('controls') ? 'open' : 'closed'}`} style={{ zIndex: 50 + openDrawers.indexOf('controls') }}>
               <LoomControlPanel
-                selectedFamilies={selectedFamilies} 
+                selectedFamilies={selectedFamilies}
                 soloFamily={soloFamily}
                 onToggleFamily={f => setSelectedFamilies(prev => prev.includes(f) ? prev.filter(x=>x!==f) : [...prev, f])}
                 onSoloFamily={f => setSoloFamily(p => p === f ? null : f)}
@@ -396,6 +397,15 @@ function App() {
                 skybox={settings.skybox} setSkybox={(val) => setSettings(s => ({ ...s, skybox: val }))}
                 useShapes={useShapes} setUseShapes={setUseShapes}
                 tooltipLevel={settings.tooltipLevel}
+              />
+            </div>
+
+            <div className={`drawer-panel ${openDrawers.includes('graph') ? 'open' : 'closed'}`} style={{ zIndex: 50 + openDrawers.indexOf('graph') }}>
+              <PrintableReport
+                result={analysisResult}
+                projectPath={projectPath}
+                legendMode={legendMode}
+                setLegendMode={setLegendMode}
               />
             </div>
           </div>
