@@ -85,6 +85,18 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.lcp-legend-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.lcp-legend-grid::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 120, 0.5);
+  border-radius: 2px;
 }
 
 .lcp-legend-item {

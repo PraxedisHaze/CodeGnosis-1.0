@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react'
 import './TheConstruct.css'
-import { Tooltip } from './Tooltip'
+import { Tooltip } from './UnifiedTooltip'
 
 interface TheConstructProps {
   analysisResult: any
@@ -68,21 +68,21 @@ export function TheConstruct({ analysisResult }: TheConstructProps) {
     <div className="construct-hall">
       <header className="construct-header">
         <div className="construct-stats">
-          <Tooltip content="Overall structural integrity. High scores indicate a clean, decoupled architecture.">
+          <Tooltip label="Integrity" content="Overall structural integrity. High scores indicate a clean, decoupled architecture.">
             <div className="construct-stat-card">
               <span className="stat-label">Integrity</span>
-              <span className="stat-value" style={{ 
-                color: stats.connectivityHealthScore >= 80 ? '#4CAF50' : '#FF9800' 
+              <span className="stat-value" style={{
+                color: stats.connectivityHealthScore >= 80 ? '#4CAF50' : '#FF9800'
               }}>{stats.connectivityHealthScore}/100</span>
             </div>
           </Tooltip>
-          <Tooltip content="Average links per file. Measures how tightly coupled the stars are.">
+          <Tooltip label="Complexity" content="Average links per file. Measures how tightly coupled the stars are.">
             <div className="construct-stat-card">
               <span className="stat-label">Complexity</span>
               <span className="stat-value">{stats.avgDependenciesPerFile} avg deps</span>
             </div>
           </Tooltip>
-          <Tooltip content="Total number of nodes detected in the current lattice.">
+          <Tooltip label="Scale" content="Total number of nodes detected in the current lattice.">
             <div className="construct-stat-card">
               <span className="stat-label">Scale</span>
               <span className="stat-value">{analysisResult.summary.totalFiles} stars</span>
@@ -91,24 +91,24 @@ export function TheConstruct({ analysisResult }: TheConstructProps) {
         </div>
 
         <nav className="construct-nav">
-          <Tooltip content="The master list of every star, categorized and sorted.">
-            <button 
+          <Tooltip label="The Ledger" content="The master list of every star, categorized and sorted.">
+            <button
               className={`construct-nav-btn ${activeView === 'files' ? 'active' : ''}`}
               onClick={() => setActiveView('files')}
             >
               The Ledger (Files)
             </button>
           </Tooltip>
-          <Tooltip content="A detailed audit of structural fractures and circular loops.">
-            <button 
+          <Tooltip label="Forensic Log" content="A detailed audit of structural fractures and circular loops.">
+            <button
               className={`construct-nav-btn ${activeView === 'health' ? 'active' : ''}`}
               onClick={() => setActiveView('health')}
             >
               Forensic Log (Health)
             </button>
           </Tooltip>
-          <Tooltip content="Insights into detected frameworks and critical hub files.">
-            <button 
+          <Tooltip label="Outer Rim" content="Insights into detected frameworks and critical hub files.">
+            <button
               className={`construct-nav-btn ${activeView === 'topology' ? 'active' : ''}`}
               onClick={() => setActiveView('topology')}
             >

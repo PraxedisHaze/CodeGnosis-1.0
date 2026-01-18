@@ -4,7 +4,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import './AnalysisReport.css'
-import { Tooltip } from './Tooltip'
+import { Tooltip } from './UnifiedTooltip'
 
 interface AnalysisReportProps {
   result: any
@@ -156,10 +156,9 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
           )}
         </div>
         <div className="hero-right">
-          <Tooltip 
+          <Tooltip
+            label="Health Score"
             content="Overall project health score (0-100). Based on circular dependencies, orphaned files, broken references, and code structure. Higher is better - aim for 80+."
-            articleId="concept-health"
-            onViewVault={onViewVault}
           >
             <div
               className="health-ring"
@@ -177,28 +176,28 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
 
       {/* Command Center - Key Metrics Grid */}
       <section className="command-center">
-        <Tooltip content="How many files are in your project. More files = more complexity to manage. This helps you understand the scale of what you're working with.">
+        <Tooltip label="Files" content="How many files are in your project. More files = more complexity to manage. This helps you understand the scale of what you're working with.">
           <div className="metric-card primary">
             <div className="metric-icon">FILES</div>
             <div className="metric-value">{summary.totalFiles || 0}</div>
             <div className="metric-sublabel">{Object.keys(summary.languages || {}).length} languages</div>
           </div>
         </Tooltip>
-        <Tooltip content="How many connections exist between files (imports, dependencies). High numbers mean files are tightly coupled - changes ripple further.">
+        <Tooltip label="Links" content="How many connections exist between files (imports, dependencies). High numbers mean files are tightly coupled - changes ripple further.">
           <div className="metric-card primary">
             <div className="metric-icon">LINKS</div>
             <div className="metric-value">{summary.totalConnections || 0}</div>
             <div className="metric-sublabel">{stats.avgDependenciesPerFile || 0} avg/file</div>
           </div>
         </Tooltip>
-        <Tooltip content="The longest chain of dependencies (A uses B uses C uses D...). Deep chains are harder for humans AND AI to follow. Keep it shallow when possible.">
+        <Tooltip label="Depth" content="The longest chain of dependencies (A uses B uses C uses D...). Deep chains are harder for humans AND AI to follow. Keep it shallow when possible.">
           <div className="metric-card primary">
             <div className="metric-icon">DEPTH</div>
             <div className="metric-value">{stats.maxDependencyChainDepth || 0}</div>
             <div className="metric-sublabel">layers deep</div>
           </div>
         </Tooltip>
-        <Tooltip content="On average, how many other files are affected when you change one file. High blast radius means changes are risky - test carefully.">
+        <Tooltip label="Blast Radius" content="On average, how many other files are affected when you change one file. High blast radius means changes are risky - test carefully.">
           <div className="metric-card primary">
             <div className="metric-icon">BLAST</div>
             <div className="metric-value" style={{ color: avgBlastRadius > 5 ? '#E67E22' : '#4CAF50' }}>{avgBlastRadius}</div>
@@ -210,7 +209,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
       {/* Intelligence Panels */}
       <div className="intel-grid">
         {/* Technical Debt Indicators */}
-        <Tooltip content="Technical debt is like clutter in your code - it slows you down over time. These meters show problem areas that will cost you time later if not addressed.">
+        <Tooltip label="Technical Debt" content="Technical debt is like clutter in your code - it slows you down over time. These meters show problem areas that will cost you time later if not addressed.">
         <section className="intel-panel debt-panel">
           <h3 onClick={() => toggleSection('debt')}>
             Technical Debt Indicators
@@ -276,7 +275,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
         </Tooltip>
 
         {/* AI Readiness Assessment */}
-        <Tooltip content="How well can AI assistants like ChatGPT or Claude understand your codebase? This tells you if you can paste the whole thing or need to feed it in chunks.">
+        <Tooltip label="AI Readiness" content="How well can AI assistants like ChatGPT or Claude understand your codebase? This tells you if you can paste the whole thing or need to feed it in chunks.">
         <section className="intel-panel ai-panel">
           <h3 onClick={() => toggleSection('ai')}>
             AI Readiness
@@ -318,7 +317,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
         </Tooltip>
 
         {/* Onboarding Intelligence */}
-        <Tooltip content="How long will it take a new developer (or you, after a break) to understand this codebase? This estimate helps with hiring decisions and project planning.">
+        <Tooltip label="Onboarding" content="How long will it take a new developer (or you, after a break) to understand this codebase? This estimate helps with hiring decisions and project planning.">
         <section className="intel-panel onboard-panel">
           <h3 onClick={() => toggleSection('onboard')}>
             Onboarding Intelligence
@@ -351,7 +350,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
 
         {/* Build Profile */}
         {buildProfile.devFootprint && (
-          <Tooltip content="How big is your project really? Dev footprint is everything on disk during development. Shipping weight is what users actually download. Big difference = optimization opportunity.">
+          <Tooltip label="Build Profile" content="How big is your project really? Dev footprint is everything on disk during development. Shipping weight is what users actually download. Big difference = optimization opportunity.">
           <section className="intel-panel build-panel">
             <h3 onClick={() => toggleSection('build')}>
               Build Profile
@@ -416,11 +415,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
         )}
 
         {/* Critical Path - Hub Files */}
-        <Tooltip 
-          content="These are the most important files in your project - many other files depend on them. Changes here affect everything. Handle with extra care and testing."
-          articleId="concept-hub-files"
-          onViewVault={onViewVault}
-        >
+        <Tooltip label="Hub Files" content="These are the most important files in your project - many other files depend on them. Changes here affect everything. Handle with extra care and testing.">
         <section className="intel-panel hubs-panel">
           <h3 onClick={() => toggleSection('hubs')}>
             Critical Path (Hub Files)
@@ -447,7 +442,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
         </Tooltip>
 
         {/* Entry Points */}
-        <Tooltip content="Start here when learning the codebase. These are the 'front doors' - main files, index files, and app entry points where execution begins.">
+        <Tooltip label="Entry Points" content="Start here when learning the codebase. These are the 'front doors' - main files, index files, and app entry points where execution begins.">
         <section className="intel-panel entry-panel">
           <h3 onClick={() => toggleSection('entry')}>
             Entry Points
@@ -474,7 +469,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
 
         {/* Health Warnings */}
         {healthWarnings.length > 0 && (
-          <Tooltip content="Problems found during analysis. These are issues that could cause bugs, slow builds, or confuse developers. Address high-severity items first.">
+          <Tooltip label="Health Warnings" content="Problems found during analysis. These are issues that could cause bugs, slow builds, or confuse developers. Address high-severity items first.">
           <section className="intel-panel warnings-panel">
             <h3 onClick={() => toggleSection('warnings')}>
               Health Warnings
@@ -509,11 +504,7 @@ export function AnalysisReport({ result, projectPath, onOpenFolder, onCopyPath, 
 
         {/* Circular Dependencies Detail */}
         {cycles.length > 0 && (
-          <Tooltip 
-            content="File A needs B, B needs C, C needs A - an infinite loop! These cause bugs, slow builds, and confuse AI tools. Breaking these cycles should be a priority."
-            articleId="concept-circular"
-            onViewVault={onViewVault}
-          >
+          <Tooltip label="Circular Deps" content="File A needs B, B needs C, C needs A - an infinite loop! These cause bugs, slow builds, and confuse AI tools. Breaking these cycles should be a priority.">
           <section className="intel-panel cycles-panel">
             <h3 onClick={() => toggleSection('cycles')}>
               Circular Dependencies

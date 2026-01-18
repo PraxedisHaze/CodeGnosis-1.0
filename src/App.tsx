@@ -19,7 +19,7 @@ import { TheConstruct } from './components/TheConstruct'
 import { VaultOfValue } from './components/VaultOfValue'
 import { AnalysisReport } from './components/AnalysisReport'
 import { PrintableReport } from './components/PrintableReport'
-import { Tooltip } from './components/Tooltip'
+import { UnifiedTooltipProvider, Tooltip } from './components/UnifiedTooltip'
 import { tooltips, getTooltip, VerbosityLevel } from './components/TooltipContent'
 import './App.css'
 
@@ -53,6 +53,16 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [sidebarPosition, setSidebarPosition] = useState<'left' | 'right'>('left')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [selectionEnabled, setSelectionEnabled] = useState(false) // Default: Clean UI (No select)
+
+  // Toggle global selection mode
+  useEffect(() => {
+    if (selectionEnabled) {
+      document.body.classList.remove('selection-disabled')
+    } else {
+      document.body.classList.add('selection-disabled')
+    }
+  }, [selectionEnabled])
   
   // Drawer System: Stack of open tabs (last opened is on top)
   const [openDrawers, setOpenDrawers] = useState<TabKey[]>(['analysis']) 
@@ -103,6 +113,7 @@ function App() {
   const [boardHit, setBoardHit] = useState(false)
   const [dartQuivering, setDartQuivering] = useState(false)
   const analysisVideoRef = useRef<HTMLVideoElement>(null)
+  const sidebarRef = useRef<HTMLDivElement>(null)
   const [settings, setSettings] = useState({
     theme: 'Dark',
     excluded: 'node_modules,.git,dist,build',
@@ -206,8 +217,8 @@ function App() {
           setShowAnalysisVideo(false)
           setAnalysisVideoOpacity(0)
           
-          // REVEAL UI
-          setShowWelcomeOverlay(true)
+          // REVEAL GRAPH (skip Mission Select - deprecated)
+          setGraphReady(true)
           setIntroComplete(true)
         } else {
           setAnalysisVideoOpacity(opacity)
@@ -231,17 +242,24 @@ function App() {
   const loomAllFiles = useMemo(() => analysisResult?.files || {}, [analysisResult])
 
   return (
+    <UnifiedTooltipProvider>
     <div className={`app app-with-sidebar ${sidebarPosition === 'right' ? 'sidebar-right' : ''}`}>
       <aside className="sidebar">
-        {/* ... Sidebar content kept identical ... */}
+        <div ref={sidebarRef} className="sidebar-inner">
         <div className="sidebar-header">
-          <h1>CodeGnosis</h1>
+          <Tooltip label="CodeGnosis" content={`<(__/^\\.|\\.^\\/__)>
+  }  KNOW      {
+  |    THY     |
+  }     CODE   {
+<(__\\./\`|\`\\./__)>`}>
+            <h1>CodeGnosis</h1>
+          </Tooltip>
           <p className="subtitle">Project Analyzer Star</p>
           <div className="header-actions">
-            <Tooltip content={getTooltip(tooltips.sidebar.settings, settings.tooltipLevel)} title="SETTINGS" anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
+            <Tooltip label="Settings" content={getTooltip(tooltips.sidebar.settings, settings.tooltipLevel)}>
               <button className="btn-icon" onClick={() => setIsSettingsOpen(true)}>⚙️</button>
             </Tooltip>
-            <Tooltip content={getTooltip(tooltips.sidebar.toggleSide, settings.tooltipLevel)} title="SIDEBAR SWAP SIDES" anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
+            <Tooltip label="Swap Sides" content={getTooltip(tooltips.sidebar.toggleSide, settings.tooltipLevel)}>
               <button className="btn-toggle-side" onClick={() => setSidebarPosition(p => p === 'left' ? 'right' : 'left')}>
                 {sidebarPosition === 'left' ? '→' : '←'}
               </button>
@@ -250,14 +268,14 @@ function App() {
         </div>
         <div className="sidebar-controls">
           {!projectPath ? (
-            <Tooltip content={getTooltip(tooltips.sidebar.selectDirectory, settings.tooltipLevel)} anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
+            <Tooltip label="Select Directory" content={getTooltip(tooltips.sidebar.selectDirectory, settings.tooltipLevel)} sidebarRef={sidebarRef}>
               <button onClick={selectDirectory} className="btn btn-primary btn-hero-large">
                 <span className="hero-text-top">TARGET</span>
                 <span className="hero-text-bottom">SELECT & ANALYZE</span>
               </button>
             </Tooltip>
           ) : analysisResult ? (
-            <Tooltip content={getTooltip(tooltips.sidebar.reset, settings.tooltipLevel)} anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
+            <Tooltip label="Reset" content={getTooltip(tooltips.sidebar.reset, settings.tooltipLevel)} sidebarRef={sidebarRef}>
               <button onClick={() => { setProjectPath(''); setAnalysisResult(null); setError(null); }} className="btn btn-secondary btn-full btn-hero-analyze">
                 RESET TO BASE
               </button>
@@ -283,19 +301,13 @@ function App() {
           <div className="sidebar-section">
             <h3>Quick Stats</h3>
             <div className="sidebar-stats">
-              <Tooltip content={getTooltip(tooltips.stats.files, settings.tooltipLevel)} anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
+              <Tooltip label="Files" content={getTooltip(tooltips.stats.files, settings.tooltipLevel)} sidebarRef={sidebarRef}>
                 <div className="sidebar-stat"><span className="stat-value">{analysisResult.summary?.totalFiles || 0}</span><span className="stat-label">Files</span></div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.stats.links, settings.tooltipLevel)} anchored={true} anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}>
+              <Tooltip label="Links" content={getTooltip(tooltips.stats.links, settings.tooltipLevel)} sidebarRef={sidebarRef}>
                 <div className="sidebar-stat"><span className="stat-value">{analysisResult.summary?.totalConnections || 0}</span><span className="stat-label">Links</span></div>
               </Tooltip>
-              <Tooltip 
-                content={getTooltip(tooltips.stats.health, settings.tooltipLevel)} 
-                anchored={true} 
-                anchorDirection={sidebarPosition === 'left' ? 'right' : 'left'}
-                articleId="concept-health"
-                onViewVault={onViewVault}
-              >
+              <Tooltip label="Health Score" content={getTooltip(tooltips.stats.health, settings.tooltipLevel)} sidebarRef={sidebarRef}>
                 <div className="sidebar-stat">
                   <span className="stat-value" style={{ color: (analysisResult.statistics?.connectivityHealthScore || 0) >= 80 ? '#4CAF50' : '#FF9800' }}>
                     {analysisResult.statistics?.connectivityHealthScore || 0}
@@ -307,6 +319,7 @@ function App() {
           </div>
         )}
         <div className="sidebar-footer"><p>Keystone Constellation</p></div>
+        </div>
       </aside>
 
       <main className="main-content">
@@ -487,6 +500,7 @@ function App() {
       )}
 
     </div>
+    </UnifiedTooltipProvider>
   )
 }
 

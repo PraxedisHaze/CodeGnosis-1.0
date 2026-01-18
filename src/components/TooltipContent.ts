@@ -220,5 +220,59 @@ export const tooltips = {
       professional: "Choose tooltip detail level: casual to technical.",
       technical: "Select verbosity tier for contextual help strings."
     } as TooltipText
+  },
+
+  // ============ MISSION BUTTONS ============
+  missions: {
+    risk: {
+      friendly: "Find the danger zones!",
+      professional: "Identify high-risk areas with complex dependencies.",
+      technical: "Highlight nodes with high cyclomatic complexity and coupling."
+    } as TooltipText,
+
+    rot: {
+      friendly: "Spot the stale stuff!",
+      professional: "Find unused or outdated code that may need cleanup.",
+      technical: "Detect orphan nodes and files with no inbound references."
+    } as TooltipText,
+
+    onboard: {
+      friendly: "Where should new folks start?",
+      professional: "Entry points and core files for onboarding new developers.",
+      technical: "Identify hub files and critical path dependencies."
+    } as TooltipText,
+
+    incident: {
+      friendly: "What could break things?",
+      professional: "High-impact files that could cause widespread issues.",
+      technical: "Calculate blast radius based on downstream dependency count."
+    } as TooltipText
+  },
+
+  // ============ VIEW CONTROLS ============
+  view: {
+    formation: {
+      friendly: "Line things up neatly!",
+      professional: "Toggle between galaxy view and structured grid layout.",
+      technical: "Switch force simulation to fixed-position grid layout."
+    } as TooltipText,
+
+    external: {
+      friendly: "Show outside libraries!",
+      professional: "Toggle visibility of external dependencies.",
+      technical: "Filter nodes matching node_modules or external patterns."
+    } as TooltipText,
+
+    restoreHorizon: {
+      friendly: "Get back to the good view!",
+      professional: "Reset camera orientation while keeping position.",
+      technical: "Animate camera lookAt to origin without position reset."
+    } as TooltipText,
+
+    resetView: {
+      friendly: "Start from scratch!",
+      professional: "Reset camera to default starting position.",
+      technical: "Reset camera position, rotation, and controls to initial state."
+    } as TooltipText
   }
 };

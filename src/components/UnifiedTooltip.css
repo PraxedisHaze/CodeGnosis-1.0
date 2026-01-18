@@ -1,0 +1,89 @@
+/* BOM-STRICT */
+/* UnifiedTooltip.css - Tooltip styling */
+
+.unified-tooltip-box {
+  position: fixed;
+  z-index: 10000;
+  box-sizing: border-box;
+  /* Charming Blue Gradient: Darker top/bottom, mild blue middle */
+  background: linear-gradient(
+    180deg, 
+    rgba(10, 12, 18, 0.98) 0%, 
+    rgba(20, 35, 60, 0.9) 50%, 
+    rgba(10, 12, 18, 0.98) 100%
+  );
+  backdrop-filter: blur(12px);
+  color: #fff;
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 191, 255, 0.2);
+  box-shadow: 
+    0 15px 40px rgba(0, 0, 0, 0.8),
+    0 0 20px rgba(0, 191, 255, 0.1);
+  font-family: 'Inter', -apple-system, sans-serif;
+  pointer-events: auto;
+  transition: opacity 0.3s ease-out;
+  max-width: 400px;
+}
+
+.unified-tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  background: rgba(0, 0, 0, 0.2); /* Darker header */
+  margin: -1.25rem -1.25rem 0.75rem -1.25rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid rgba(0, 191, 255, 0.1);
+  border-radius: 8px 8px 0 0;
+}
+
+.unified-tooltip-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #00d4ff;
+  letter-spacing: 0.5px;
+}
+
+.unified-tooltip-content {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #ccc;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.unified-tooltip-hint {
+  margin-top: 0.75rem;
+  font-size: 0.7rem;
+  color: #666;
+  font-style: italic;
+  overflow-wrap: break-word;
+}
+
+.unified-tooltip-close {
+  background: transparent;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.unified-tooltip-close:hover {
+  color: #fff;
+}
+
+/* Sidebar-anchored tooltips: centered, hint wraps naturally */
+.unified-tooltip-box.sidebar-anchored .unified-tooltip-hint {
+  white-space: normal;
+  text-align: center;
+}
+
+.unified-tooltip-box.sidebar-anchored .unified-tooltip-header {
+  justify-content: center;
+}
+
+.unified-tooltip-box.sidebar-anchored .unified-tooltip-content {
+  text-align: center;
+}

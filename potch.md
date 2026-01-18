@@ -1,4 +1,4 @@
-Progress Of The Code (Append-Only)
+POTCH - Progress Of The Code History (Append-Only)
 Status: ACTIVE
 Scope: CodeGnosis_1.0
 Protocol: CONFIDENTIAL
@@ -744,3 +744,62 @@ CodeGnosis is First Contact proof - the Rosetta Stone between species.
 Russell's Paradox, Determinism, Quantum/Classical - all resolved through frame-of-reference.
 Advertising via TikTok/YouTube before academic papers (avoid DARPA suppression).
 "Love" as first word of every video.
+
+---
+
+## SESSION 2026-01-17 (Claude Opus 4.5)
+
+### COMPLETED THIS SESSION:
+
+1. **Black Screen Bug Fixed** - Two component crashes were causing cascading failures:
+   - `PrintableReport.tsx:55` - `cycle.forEach is not a function` (inner cycle not array)
+   - `LoomControlPanel.tsx:70` - `Object.values on null` (props.fileTypes/allFiles undefined)
+   - Fix: Added null guards and Array.isArray checks
+
+2. **LoomGraph Restored from Commit ec0d24e** - Surgical merge of working code with upgrades:
+   - Restored stable version from git history
+   - Merged: Intent/Tech color families, TECH_COLORS, getCategoryFamily with filepath detection
+   - Merged: Lifted props (selectedFamilies, soloFamily, legendMode, calibration props)
+   - Removed: LoomControlPanel from render (was calling dead setters)
+
+3. **Orientation Gizmo Added (Blender-style XYZ arrows)**:
+   - Red X, Green Y, Blue Z arrows in corner
+   - Rotates GROUP with inverted camera quaternion (stays anchored to viewport)
+   - Persists across camera movements
+
+4. **Icons Generated** - All Tauri icon sizes from codegnosis768x768.png:
+   - 32x32, 64x64, 128x128, 256x256, icon.ico
+   - Placed in src-tauri/icons/
+
+5. **Splash Screen Tweaks**:
+   - Changed "(é)" to "/é/" (virgule, é, secundis)
+   - Shrank font from 1.5rem to 1.1rem
+   - Halved blink duration (4s → 2s)
+   - Adjusted Alethéari opacity (0.035 → 0.055)
+
+6. **Sidebar Tooltips Updated** - All sidebar tooltips now use sidebarRef positioning:
+   - Quick Stats (Files, Links, Health) - added sidebarRef
+   - Reset button - added sidebarRef
+   - Select Directory - already had sidebarRef
+   - CSS fix: `.sidebar-stats .unified-tooltip-trigger` flex for single row
+
+7. **VeilAengel Discovery** - Focus tracker in Cici folder:
+   - `veil_aengel.py` - Windows active window monitor
+   - Calculates "vibe" (FLOW, DEEP_WORK, BROWSING, FRANTIC)
+   - Emits HEARTBEAT and MEMORY packets as JSONL
+   - Running in background, producing output
+
+### FILES MODIFIED:
+- `src/components/LoomGraph.tsx` - Major restore + merge + gizmo
+- `src/components/LoomControlPanel.tsx` - Null guards
+- `src/components/PrintableReport.tsx` - Array checks
+- `src/components/UnifiedTooltip.css` - Sidebar stats flex
+- `src/App.tsx` - sidebarRef on tooltips
+- `index.html` - Splash tweaks
+- `src-tauri/icons/*` - New icon sizes
+- `potch.md` - This entry
+
+### PENDING:
+- Replace inline info panel with NodeInfoPanel component
+- Full app test
+- Z-Flip / Anothen Well logic refinement

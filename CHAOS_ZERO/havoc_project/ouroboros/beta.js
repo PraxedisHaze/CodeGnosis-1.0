@@ -1,0 +1,1 @@
+import { gamma } from "./gamma"; export const beta = gamma + 1;

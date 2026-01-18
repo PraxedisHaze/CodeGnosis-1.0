@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeGnosis Launch Command</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --panel-bg: rgba(16, 20, 30, 0.95);
+            --border-color: rgba(0, 212, 255, 0.2);
+            --accent-color: #00d4ff;
+            --success-color: #4ade80;
+            --warning-color: #facc15;
+            --text-color: #e0e0e0;
+            --muted-color: #6b7280;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background-image: 
+                linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* --- HEADER HUD --- */
+        header {
+            width: 100%;
+            max-width: 1000px;
+            padding: 2rem 1rem;
+            margin-top: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 30%;
+            height: 3px;
+            background: var(--accent-color);
+            box-shadow: 0 0 15px var(--accent-color);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .mission-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .status-label {
+            font-size: 0.8rem;
+            color: var(--muted-color);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .status-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--success-color);
+            text-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+        }
+
+        /* --- PROGRESS BAR --- */
+        .progress-container {
+            width: 100%;
+            max-width: 1000px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            margin-top: 1rem;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-color), var(--success-color));
+            width: 0%;
+            transition: width 0.5s ease-out;
+            box-shadow: 0 0 15px var(--accent-color);
+        }
+
+        /* --- MAIN CONTENT --- */
+        main {
+            width: 100%;
+            max-width: 1000px;
+            padding: 2rem 1rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        /* --- SECTIONS --- */
+        section {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        section:hover {
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        section.complete {
+            border-color: var(--success-color);
+        }
+
+        section.complete .section-header {
+            background: rgba(74, 222, 128, 0.1);
+        }
+
+        .section-header {
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-icon {
+            color: var(--accent-color);
+            font-size: 1.2rem;
+        }
+
+        section.complete .section-icon {
+            color: var(--success-color);
+        }
+
+        .section-progress {
+            font-size: 0.9rem;
+            color: var(--muted-color);
+            font-family: monospace;
+        }
+
+        .checklist {
+            padding: 0;
+            margin: 0;
+            list-style: none;
+            max-height: 0; /* Collapsed by default */
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+        }
+
+        section.expanded .checklist {
+            max-height: 1000px; /* Arbitrary large height for expansion */
+            padding: 1rem 0;
+        }
+
+        .checklist-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        .checklist-item:last-child {
+            border-bottom: none;
+        }
+
+        .checklist-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* --- CHECKBOX --- */
+        .checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--muted-color);
+            border-radius: 4px;
+            margin-right: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .checklist-item.checked .checkbox {
+            background: var(--success-color);
+            border-color: var(--success-color);
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.4);
+        }
+
+        .checkbox::after {
+            content: '✔';
+            font-size: 14px;
+            color: #000;
+            display: none;
+        }
+
+        .checklist-item.checked .checkbox::after {
+            display: block;
+        }
+
+        .item-text {
+            flex: 1;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            transition: color 0.2s;
+        }
+
+        .checklist-item.checked .item-text {
+            color: var(--muted-color);
+            text-decoration: line-through;
+        }
+
+        /* --- RESET BUTTON --- */
+        .reset-btn {
+            margin: 2rem;
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 0, 60, 0.1);
+            border: 1px solid rgba(255, 0, 60, 0.3);
+            color: #ff003c;
+            border-radius: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+
+        .reset-btn:hover {
+            background: rgba(255, 0, 60, 0.2);
+            box-shadow: 0 0 15px rgba(255, 0, 60, 0.2);
+        }
+
+        /* --- SOUND --- */
+        /* Audio element hidden */
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>Launch Command</h1>
+            <div style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">PROTOCOL: SHIP_READY // CODEGNOSIS</div>
+        </div>
+        <div class="mission-status">
+            <span class="status-label">Readiness</span>
+            <span class="status-value" id="total-percent">0%</span>
+        </div>
+    </header>
+
+    <div class="progress-container">
+        <div class="progress-bar" id="global-progress"></div>
+    </div>
+
+    <main id="checklist-container">
+        <!-- Sections injected by JS -->
+    </main>
+
+    <button class="reset-btn" onclick="resetProgress()">⚠ Reset Protocol</button>
+
+    <script>
+        const checklistData = [
+            {
+                title: "0. Identity & Provenance",
+                icon: "🆔",
+                items: [
+                    "File headers include SPDX, Authors, Reviewed-by, Source, Glyphs",
+                    "Version set (SemVer): MAJOR.MINOR.PATCH in package.json/Cargo.toml",
+                    "App registry entry updated (name, slug, type, deps)"
+                ]
+            },
+            {
+                title: "1. BOM Compliance (Integrity)",
+                icon: "🏗️",
+                items: [
+                    "No one-line catch; all try/catch {} blocks formatted",
+                    "Globals explicitly declared for shared state",
+                    "No hidden background work; reversible diffs only",
+                    "Glyphs added for each intentional change",
+                    "Guardian vet-diff run; warnings resolved/waived"
+                ]
+            },
+            {
+                title: "2. Security & Consent",
+                icon: "🔒",
+                items: [
+                    "No credentials or tokens in code or logs (Scan complete)",
+                    "Writes only to approved paths (%AppData%); never Program Files",
+                    "Clear consent for any automation or user action",
+                    "Logging omits sensitive info",
+                    "Hub enforces Star permissions (manifest check)"
+                ]
+            },
+            {
+                title: "3. Functionality (The Happy Path)",
+                icon: "✅",
+                items: [
+                    "Happy path verified on Windows 11 (Launch -> Graph -> Report)",
+                    "All hotkeys documented and non-colliding",
+                    "Errors surface clearly ('Galaxy Engine Stalled' shield works)",
+                    "Configurable paths & defaults documented"
+                ]
+            },
+            {
+                title: "4. UX & Accessibility (The Welcome)",
+                icon: "👁️",
+                items: [
+                    "Click-through vs interactive areas clearly defined (Z-Index check)",
+                    "Text legible at 125% / 150% scaling",
+                    "Keyboard-only flows tested (Tab navigation)",
+                    "Color contrast meets WCAG AA (Check neon text against background)"
+                ]
+            },
+            {
+                title: "5. Performance (The Flow)",
+                icon: "⚡",
+                items: [
+                    "No unnecessary timers; event-driven where possible",
+                    "Overlay redraw only on meaningful change (React.memo check)",
+                    "Animations smooth (60 fps target) - Graph performance check"
+                ]
+            },
+            {
+                title: "6. Legal & Distribution",
+                icon: "⚖️",
+                items: [
+                    "Third-party licenses bundled (THIRD_PARTY_NOTICES.txt created)",
+                    "SPLIT.md conditional (Revenue share defined)",
+                    "AUTHORS.md updated with human and AI roles",
+                    "Privacy Policy & ToS drafted/linked",
+                    "Windows Code Signing Certificate secured (if applicable)"
+                ]
+            },
+            {
+                title: "7. Marketing & Store",
+                icon: "🚀",
+                items: [
+                    "Landing Page Live (Screenshots, Value Prop)",
+                    "Pricing Model Set (Stripe/Gumroad integration tested)",
+                    "Support Channel Active (Discord/Email)",
+                    "Refund Policy Documented"
+                ]
+            },
+            {
+                title: "8. The Ghost Protocol",
+                icon: "👻",
+                items: [
+                    "Uninstaller removes App Directory & Logs",
+                    "Uninstaller prompts to keep/wipe %AppData%",
+                    "Registry Hygiene check (Zero orphan keys)",
+                    "No background updaters left running"
+                ]
+            },
+            {
+                title: "9. Ritual Anchoring",
+                icon: "🔮",
+                items: [
+                    "Glyph tag for this release created",
+                    "Emotional intent declared (BLESS, BUILD, REPAIR)",
+                    "Witnessed-by validation complete",
+                    "Fabrication check (Confirm no hallucinations in doc)"
+                ]
+            },
+            {
+                title: "10. Settings: Appearance",
+                icon: "🎨",
+                items: [
+                    "Theme option (Light / Dark / System)",
+                    "Accent color customization (if applicable)",
+                    "Font size / scaling options",
+                    "Language / locale selection",
+                    "Compact vs comfortable density toggle"
+                ]
+            },
+            {
+                title: "11. Settings: Accessibility",
+                icon: "♿",
+                items: [
+                    "Reduced motion option",
+                    "High contrast mode",
+                    "Screen reader hints / ARIA labels",
+                    "Keyboard shortcuts list accessible",
+                    "Focus indicators visible"
+                ]
+            },
+            {
+                title: "12. Settings: Notifications",
+                icon: "🔔",
+                items: [
+                    "Master enable/disable toggle",
+                    "Email notifications (if applicable)",
+                    "Push/desktop notifications toggle",
+                    "Sound on/off",
+                    "Do not disturb / quiet hours"
+                ]
+            },
+            {
+                title: "13. Settings: Privacy & Data",
+                icon: "🔐",
+                items: [
+                    "Analytics opt-out",
+                    "Crash reporting opt-out",
+                    "Data export option (GDPR compliance)",
+                    "Clear local data / cache button",
+                    "Delete account option (if applicable)"
+                ]
+            },
+            {
+                title: "14. Settings: Security",
+                icon: "🛡️",
+                items: [
+                    "Change password (if auth exists)",
+                    "Two-factor auth option",
+                    "Active sessions / logout all",
+                    "Login history view"
+                ]
+            },
+            {
+                title: "15. Settings: Performance",
+                icon: "⚡",
+                items: [
+                    "Auto-save toggle",
+                    "Cache size / clear cache",
+                    "Offline mode (if applicable)",
+                    "Hardware acceleration toggle",
+                    "Startup behavior (open at login, start minimized)"
+                ]
+            },
+            {
+                title: "16. Settings: Content Defaults",
+                icon: "📋",
+                items: [
+                    "Default view / landing tab",
+                    "Sort order preferences",
+                    "Show/hide sections toggles",
+                    "Items per page (if lists)"
+                ]
+            },
+            {
+                title: "17. Settings: Help & Legal",
+                icon: "📚",
+                items: [
+                    "About / version info",
+                    "Check for updates button",
+                    "Keyboard shortcuts reference",
+                    "Help / documentation link",
+                    "Contact support / feedback link",
+                    "Terms of service link",
+                    "Privacy policy link",
+                    "Licenses / credits page"
+                ]
+            },
+            {
+                title: "18. Settings: Desktop App Specific",
+                icon: "🖥️",
+                items: [
+                    "Remember window size/position",
+                    "Always on top option",
+                    "Minimize to tray",
+                    "Close button behavior (minimize vs quit)"
+                ]
+            },
+            {
+                title: "19. Testing & QA",
+                icon: "🧪",
+                items: [
+                    "Unit tests pass",
+                    "Integration tests pass",
+                    "E2E tests pass (if applicable)",
+                    "Manual QA completed on target OS",
+                    "Edge cases tested (empty, overflow, large data)",
+                    "Regression tests after bug fixes",
+                    "Cross-platform tested (if multi-platform)"
+                ]
+            },
+            {
+                title: "20. Build & IDE Hygiene",
+                icon: "🔧",
+                items: [
+                    "VS Code shows zero errors",
+                    "Lint warnings resolved or explicitly waived",
+                    "TypeScript / type errors resolved",
+                    "Build completes without warnings",
+                    "Bundle size acceptable for target",
+                    "No console.log statements in production",
+                    "Dead code removed",
+                    "No TODO/FIXME comments left unaddressed"
+                ]
+            },
+            {
+                title: "21. Documentation",
+                icon: "📖",
+                items: [
+                    "README complete and current",
+                    "User guide / help docs written",
+                    "CHANGELOG updated for this release",
+                    "API docs (if applicable)",
+                    "Known issues documented",
+                    "Installation instructions clear",
+                    "Troubleshooting section included"
+                ]
+            },
+            {
+                title: "22. First-Run Experience",
+                icon: "👋",
+                items: [
+                    "Onboarding flow works",
+                    "Empty states handled gracefully",
+                    "Tutorial or walkthrough available",
+                    "First-launch permissions explained",
+                    "Sample project or demo data (if applicable)",
+                    "Welcome message / getting started guide"
+                ]
+            },
+            {
+                title: "23. Error Handling & Recovery",
+                icon: "🔄",
+                items: [
+                    "Error boundaries catch crashes",
+                    "Graceful degradation when features fail",
+                    "Network failure handling (retry, offline message)",
+                    "Crash recovery (restore last state)",
+                    "User data backup option",
+                    "Import/export functionality works",
+                    "Meaningful error messages (not stack traces)"
+                ]
+            },
+            {
+                title: "24. Internationalization (i18n)",
+                icon: "🌍",
+                items: [
+                    "All UI strings externalized (no hardcoded text)",
+                    "RTL layout support (if applicable)",
+                    "Date/time formatted per locale",
+                    "Currency formatted per locale",
+                    "Number formatting (decimals, thousands)",
+                    "Pluralization rules handled"
+                ]
+            },
+            {
+                title: "25. Updates & Migration",
+                icon: "⬆️",
+                items: [
+                    "Update mechanism works",
+                    "Version displayed in UI (About screen)",
+                    "Data migration from previous versions tested",
+                    "Rollback path exists and documented",
+                    "Breaking changes communicated to users",
+                    "Auto-update toggle in settings (if auto-update exists)"
+                ]
+            }
+        ];
+
+        // --- STATE MANAGEMENT ---
+        const STORAGE_KEY = 'codegnosis_launch_state';
+        let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+
+        function saveState() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            updateUI();
+        }
+
+        function toggleItem(sectionIndex, itemIndex) {
+            const key = `${sectionIndex}-${itemIndex}`;
+            state[key] = !state[key];
+            
+            // Haptic/Sound placeholder
+            if(state[key]) playCheckSound();
+            
+            saveState();
+        }
+
+        function playCheckSound() {
+            // Simple oscillator beep for "Tech" feel
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+            
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+            
+            osc.start();
+            osc.stop(ctx.currentTime + 0.1);
+        }
+
+        function toggleSection(header) {
+            const section = header.parentElement;
+            section.classList.toggle('expanded');
+        }
+
+        function resetProgress() {
+            if(confirm("⚠ RESET LAUNCH PROTOCOL?\nThis will clear all checkboxes.")) {
+                state = {};
+                saveState();
+            }
+        }
+
+        function updateUI() {
+            const container = document.getElementById('checklist-container');
+            container.innerHTML = ''; // Re-render (inefficient but simple for this scale)
+
+            let totalItems = 0;
+            let checkedItems = 0;
+
+            checklistData.forEach((section, sIdx) => {
+                const sectionEl = document.createElement('section');
+                
+                // Calculate section progress
+                let sectionTotal = section.items.length;
+                let sectionChecked = 0;
+                section.items.forEach((_, iIdx) => {
+                    if (state[`${sIdx}-${iIdx}`]) sectionChecked++;
+                });
+
+                if (sectionChecked === sectionTotal) sectionEl.classList.add('complete');
+                
+                // Auto-expand if active but not complete, or if it's the first one
+                const isExpanded = sectionChecked < sectionTotal && (sIdx === 0 || checklistData[sIdx-1].items.every((_, i) => state[`${sIdx-1}-${i}`]));
+                if (isExpanded) sectionEl.classList.add('expanded');
+
+                totalItems += sectionTotal;
+                checkedItems += sectionChecked;
+
+                sectionEl.innerHTML = `
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <div class="section-title">
+                            <span class="section-icon">${section.icon}</span>
+                            ${section.title}
+                        </div>
+                        <span class="section-progress">${sectionChecked}/${sectionTotal}</span>
+                    </div>
+                    <ul class="checklist">
+                        ${section.items.map((item, iIdx) => {
+                            const isChecked = state[`${sIdx}-${iIdx}`];
+                            return `
+                                <li class="checklist-item ${isChecked ? 'checked' : ''}" onclick="toggleItem(${sIdx}, ${iIdx})">
+                                    <div class="checkbox"></div>
+                                    <span class="item-text">${item}</span>
+                                </li>
+                            `;
+                        }).join('')}
+                    </ul>
+                `;
+                container.appendChild(sectionEl);
+            });
+
+            // Update Global Status
+            const percent = Math.round((checkedItems / totalItems) * 100);
+            document.getElementById('total-percent').innerText = `${percent}%`;
+            document.getElementById('global-progress').style.width = `${percent}%`;
+            
+            // Color shift based on completion
+            if (percent === 100) {
+                document.getElementById('total-percent').style.textShadow = "0 0 20px #4ade80";
+            }
+        }
+
+        // Init
+        updateUI();
+
+    </script>
+</body>
+</html>

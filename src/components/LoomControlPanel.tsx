@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import './LoomControlPanel.css'
-import { Tooltip } from './Tooltip'
+import { Tooltip } from './UnifiedTooltip'
 import { tooltips, getTooltip, VerbosityLevel } from './TooltipContent'
 
 const CATEGORY_FAMILIES: Record<string, string> = {
@@ -67,16 +67,19 @@ export function LoomControlPanel(props: Props) {
   // Calculate counts for Tech mode
   const techCounts = useMemo(() => {
     const counts: Record<string, number> = {}
-    Object.values(props.fileTypes).forEach(type => {
-      counts[type] = (counts[type] || 0) + 1
-    })
+    if (props.fileTypes) {
+      Object.values(props.fileTypes).forEach(type => {
+        counts[type] = (counts[type] || 0) + 1
+      })
+    }
     return Object.entries(counts).sort((a, b) => b[1] - a[1])
   }, [props.fileTypes])
 
   // Calculate counts for Intent mode
   const intentCounts = useMemo(() => {
     const counts: Record<string, number> = {}
-    Object.entries(props.allFiles).forEach(([path, info]) => {
+    if (props.allFiles) {
+      Object.entries(props.allFiles).forEach(([path, info]) => {
       // Use the same heuristic as LoomGraph
       let family = CATEGORY_FAMILIES[info.category] || 'Unknown'
       const filename = path.split(/[\\/]/).pop()?.toLowerCase() || ''
@@ -84,7 +87,8 @@ export function LoomControlPanel(props: Props) {
         family = 'Config'
       }
       counts[family] = (counts[family] || 0) + 1
-    })
+      })
+    }
     return counts
   }, [props.allFiles])
 
@@ -132,8 +136,14 @@ export function LoomControlPanel(props: Props) {
             ) : (
               techCounts.map(([type, count]) => {
                 const color = getTechColor(type)
+                const active = props.soloFamily === type
                 return (
-                  <div key={type} className="lcp-legend-item" style={{ background: `${color}15` }}>
+                  <div
+                    key={type}
+                    className={`lcp-legend-item ${active ? 'active' : ''}`}
+                    style={{ background: `${color}15`, color: active ? '#fff' : 'rgba(255,255,255,0.7)' }}
+                    onClick={() => props.onSoloFamily(type)}
+                  >
                     <div className="lcp-dot" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
                     <span className="lcp-label-text">{type}</span>
                     <span className="lcp-count">{count}</span>
@@ -144,44 +154,45 @@ export function LoomControlPanel(props: Props) {
           </div>
         </div>
 
-        {/* CALIBRATION */}        <div className="lcp-section">
+        {/* CALIBRATION */}
+        <div className="lcp-section">
           <div className="lcp-calibration">
-              <Tooltip content={getTooltip(tooltips.controls.atmosphere, level)} anchored>
+              <Tooltip label="Atmosphere" content={getTooltip(tooltips.controls.atmosphere, level)}>
                 <div className="lcp-slider">
                   <label>Atmosphere <small>(Bloom)</small></label>
                   <input type="range" min="0" max="2" step="0.05" value={props.bloomIntensity} onChange={e => props.setBloomIntensity(+e.target.value)} />
                   <span>{Math.round(props.bloomIntensity * 100)}%</span>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.controls.starMass, level)} anchored>
+              <Tooltip label="Star Mass" content={getTooltip(tooltips.controls.starMass, level)}>
                 <div className="lcp-slider">
                   <label>Star Mass <small>(Size)</small></label>
                   <input type="range" min="0" max="2" step="0.05" value={props.starSize} onChange={e => props.setStarSize(+e.target.value)} />
                   <span>{Math.round(props.starSize * 100)}%</span>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.controls.cableLinks, level)} anchored>
+              <Tooltip label="Cable Links" content={getTooltip(tooltips.controls.cableLinks, level)}>
                 <div className="lcp-slider">
                   <label>Cable Links <small>(Lines)</small></label>
                   <input type="range" min="0" max="2" step="0.05" value={props.linkOpacity} onChange={e => props.setLinkOpacity(+e.target.value)} />
                   <span>{Math.round(props.linkOpacity * 100)}%</span>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.controls.background, level)} anchored>
+              <Tooltip label="Background" content={getTooltip(tooltips.controls.background, level)}>
                 <div className="lcp-slider">
                   <label>Background <small>(Stars)</small></label>
                   <input type="range" min="0" max="2" step="0.05" value={props.starBrightness} onChange={e => props.setStarBrightness(+e.target.value)} />
                   <span>{Math.round(props.starBrightness * 100)}%</span>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.settings.twinkle, level)} anchored>
+              <Tooltip label="Twinkle" content={getTooltip(tooltips.settings.twinkle, level)}>
                 <div className="lcp-slider">
                   <label>Twinkle <small>(Animation)</small></label>
                   <input type="range" min="0" max="1" step="0.1" value={props.twinkleIntensity} onChange={e => props.setTwinkleIntensity(+e.target.value)} />
                   <span>{Math.round(props.twinkleIntensity * 100)}%</span>
                 </div>
               </Tooltip>
-              <Tooltip content={getTooltip(tooltips.controls.spread, level)} anchored>
+              <Tooltip label="Spread" content={getTooltip(tooltips.controls.spread, level)}>
                 <div className="lcp-slider">
                   <label>Spread <small>(Gravity)</small></label>
                   <div className="lcp-segmented-control">
@@ -216,7 +227,7 @@ export function LoomControlPanel(props: Props) {
                   <button className={props.useShapes ? 'active' : ''} onClick={() => props.setUseShapes(true)}>Shapes</button>
                 </div>
               </div>
-              <Tooltip content={getTooltip(tooltips.controls.skybox, level)} anchored>
+              <Tooltip label="Skybox" content={getTooltip(tooltips.controls.skybox, level)}>
                 <div className="lcp-slider">
                   <label>Skybox</label>
                   <select value={props.skybox} onChange={e => props.setSkybox(e.target.value)}>

@@ -12,6 +12,10 @@
         background: #000;
         overflow: hidden;
         font-family: system-ui, -apple-system, sans-serif;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
       }
 
       #splash-screen {
@@ -109,6 +113,7 @@
         text-align: center;
         font-size: 6.0rem;
         --tx: 0;
+        color: rgba(255, 255, 255, 0.055);
       }
 
       /* === HEARTBEAT LINE SYSTEM === */
@@ -304,18 +309,18 @@
         position: fixed;
         bottom: 2rem;
         left: 2rem;
-        font-size: 1.5rem;
+        font-size: 1.1rem;
         color: #fff;
         opacity: 0;
         z-index: 3;
-        animation: flashE 4s linear forwards;
+        animation: flashE 2s linear forwards;
       }
       @keyframes flashE {
         0%, 48% { opacity: 0; }
         50%, 52% { opacity: 1; }
         54%, 74% { opacity: 0; }
-        75%, 76% { opacity: 1; }
-        100% { opacity: 0; }
+        75%, 77% { opacity: 1; }
+        79%, 100% { opacity: 0; }
       }
 
       #launch-btn {
@@ -347,6 +352,18 @@
       @keyframes glowPulse {
         0%, 100% { box-shadow: 0 0 30px rgba(100, 180, 255, 0.3), 0 0 60px rgba(0,0,0,0.8); }
         50% { box-shadow: 0 0 40px rgba(100, 180, 255, 0.5), 0 0 80px rgba(0,0,0,0.8); }
+      }
+
+      #key-hint {
+        display: none;
+        position: absolute;
+        top: 82%;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.75rem;
+        letter-spacing: 0.2em;
+        color: rgba(150, 200, 255, 0.5);
+        text-transform: lowercase;
       }
 
       #splash-screen.fade-out {
@@ -390,8 +407,9 @@
 
         <div id="splash-loading">LOADING</div>
         <button id="launch-btn" onclick="launchVideo()">TAKE FLIGHT</button>
+        <div id="key-hint">or press any key</div>
       </div>
-      <div id="flash-e">(&eacute;)</div>
+      <div id="flash-e">/&eacute;/</div>
     </div>
 
     <div id="root"></div>
@@ -411,10 +429,15 @@
         window.__appReady = true;
         document.getElementById('splash-loading').style.display = 'none';
         document.getElementById('launch-btn').style.display = 'block';
+        document.getElementById('key-hint').style.display = 'block';
       };
 
-      // User clicks Launch
+      // User clicks Launch (or presses any key)
       function launchVideo() {
+        // Prevent double-triggering
+        if (window.__launching) return;
+        window.__launching = true;
+
         var splashText = document.getElementById('splash-text');
 
         // Fade out text
@@ -427,6 +450,14 @@
           closeSplash();
         });
       }
+
+      // Press any key to continue (when ready)
+      document.addEventListener('keydown', function(e) {
+        // Only trigger if app is ready and splash is still visible
+        if (window.__appReady && document.getElementById('splash-screen')) {
+          launchVideo();
+        }
+      });
 
       function closeSplash() {
         var splash = document.getElementById('splash-screen');

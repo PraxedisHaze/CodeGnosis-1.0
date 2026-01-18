@@ -21,7 +21,7 @@ const getMissionData = (result: any) => {
   const filesObj = result.files || {}
   const files = Object.keys(filesObj)
   const deps = result.dependencyGraph || {}
-  const cycles = result.cycles || []
+  const cycles = Array.isArray(result.cycles) ? result.cycles : []
   const broken = result.brokenReferences || []
 
   // Calculate inbound counts
@@ -52,7 +52,11 @@ const getMissionData = (result: any) => {
 
   // INCIDENT: Files in cycles (fragile dependencies)
   const cycleFiles = new Set<string>()
-  cycles.forEach((cycle: string[]) => cycle.forEach(f => cycleFiles.add(f)))
+  cycles.forEach((cycle: any) => {
+    if (Array.isArray(cycle)) {
+      cycle.forEach(f => cycleFiles.add(f))
+    }
+  })
 
   // OPTIMIZE: Heavy dependency chains
   const outboundCounts = Object.entries(deps)

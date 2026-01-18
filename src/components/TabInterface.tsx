@@ -1,6 +1,7 @@
 // BOM-STRICT
+import { useRef } from 'react'
 import './TabInterface.css'
-import { Tooltip } from './Tooltip'
+import { TabTooltipTrigger } from './UnifiedTooltip'
 import { tooltips, getTooltip, VerbosityLevel } from './TooltipContent'
 
 type TabKey = 'analysis' | 'graph' | 'codeCity' | 'vault' | 'controls'
@@ -20,50 +21,32 @@ const TABS: { key: TabKey; label: string; tooltipKey: keyof typeof tooltips.tabs
   { key: 'graph', label: 'Export', tooltipKey: 'graph' }
 ]
 
-// Drawer widths for positioning tabs at drawer edge
-const DRAWER_WIDTHS: Record<TabKey, number> = {
-  controls: 333,
-  analysis: 333,
-  codeCity: 333,
-  vault: 800,
-  graph: 333
-}
-
 export function TabInterface({ openDrawers, onToggleDrawer, tooltipLevel, sidebarPosition }: TabInterfaceProps) {
   const hasOpenDrawer = openDrawers.length > 0
   const drawerState = hasOpenDrawer ? 'drawer-open' : 'drawer-closed'
+  const containerRef = useRef<HTMLDivElement>(null)
 
   return (
     <div className={`tab-system side-${sidebarPosition} ${drawerState}`}>
-      {/* Hydraulic Rail - Horizontal bar at top */}
-      <div className="hydraulic-rail" />
-
       {/* Tab Buttons - Horizontal row */}
       <div className="tab-row">
-        <div className="tab-container">
+        <div className="tab-container" ref={containerRef}>
           {TABS.map((tab) => (
-            <button
+            <TabTooltipTrigger
               key={tab.key}
-              className={`tab-button ${openDrawers.includes(tab.key) ? 'active' : ''}`}
-              onClick={() => onToggleDrawer(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="tab-tooltips">
-          {TABS.map((tab) => (
-            <Tooltip
-              key={tab.key}
+              tooltipKey={tab.key}
+              label={tab.label}
               content={getTooltip(tooltips.tabs[tab.tooltipKey], tooltipLevel)}
-              anchored={true}
-              anchorDirection="right"
+              anchorSide={sidebarPosition === 'left' ? 'right' : 'left'}
+              containerRef={containerRef}
             >
-              <div className="tab-tooltip-stack" aria-hidden="true">
+              <button
+                className={`tab-button ${openDrawers.includes(tab.key) ? 'active' : ''}`}
+                onClick={() => onToggleDrawer(tab.key)}
+              >
                 {tab.label}
-              </div>
-            </Tooltip>
+              </button>
+            </TabTooltipTrigger>
           ))}
         </div>
       </div>

@@ -1,17 +1,113 @@
 /* BOM-STRICT */
-/* VaultOfValue.css - The Gnostic Encyclopedia Styling */
+/* VaultOfValue.css - The Ancient Registry Styling */
 
 .vault-hall {
   flex: 1;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  background: rgba(10, 12, 18, 0.85);
-  box-shadow: 0 0 60px 30px rgba(0, 0, 0, 0.8);
-  border-radius: 12px;
-  color: #fff;
-  overflow: hidden; /* Sidebar and content handle their own scrolling */
+  min-height: 0;
+  background: #1a120b; /* Deep Leather */
+  background-image: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%);
+  color: #d4c4a8; /* Aged Parchment */
+  padding: 2rem 3rem;
+  font-family: 'Crimson Text', 'Georgia', serif;
+  line-height: 1.6;
+  border: 12px double #3d2b1f; /* Elaborate frame */
+  border-radius: 4px;
+  box-shadow: inset 0 0 50px rgba(0,0,0,0.8), 0 10px 30px rgba(0,0,0,0.5);
+  overflow-y: auto;
 }
+
+.vault-hall h1, .vault-hall h2, .vault-hall h3 {
+  font-family: 'Cinzel', 'Trajan Pro', serif;
+  color: #ffb700; /* Burnished Gold */
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-align: center;
+  border-bottom: 1px solid #3d2b1f;
+  padding-bottom: 0.5rem;
+  margin-top: 2.5rem;
+}
+
+.vault-hall h1 {
+  font-size: 2.5rem;
+  margin-top: 0;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.vault-hall p {
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+  text-align: justify;
+}
+
+/* ILLUMINATED DROP CAP */
+.vault-hall p:first-of-type::first-letter {
+  float: left;
+  font-size: 5rem;
+  line-height: 0.8;
+  padding-top: 0.2rem;
+  padding-right: 0.5rem;
+  padding-left: 0.1rem;
+  font-family: 'Old English Text MT', 'UnifrakturMaguntia', serif;
+  color: #ffb700;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+}
+
+/* ARTICLES / CARDS */
+.vault-article {
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.vault-article::before {
+  content: '❧'; /* Section divider */
+  display: block;
+  text-align: center;
+  font-size: 2rem;
+  color: #3d2b1f;
+  margin: 2rem 0;
+}
+
+.vault-hall blockquote {
+  font-style: italic;
+  border-left: 3px solid #3d2b1f;
+  padding-left: 1.5rem;
+  margin: 2rem 0;
+  color: #a89a84;
+}
+
+.vault-hall .highlight {
+  color: #ffb700;
+  font-weight: bold;
+}
+
+/* Navigation List inside Vault */
+.vault-nav {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  flex-wrap: wrap;
+}
+
+.vault-nav-item {
+  color: #8a7a64;
+  text-decoration: none;
+  font-variant: small-caps;
+  letter-spacing: 1px;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+
+.vault-nav-item:hover {
+  color: #ffb700;
+}
+
+.vault-nav-item.active {
+  color: #ffb700;
+  border-bottom: 1px solid #ffb700;
+}
+
 
 /* --- SIDEBAR --- */
 .vault-sidebar {
